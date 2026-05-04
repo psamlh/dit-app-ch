@@ -19,7 +19,11 @@ button,input,select{font-family:inherit;color:inherit}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#9B8FAE;margin-left:auto}
 .sync-dot.ok{background:#5DCAA5}
 .sync-dot.err{background:#E24B4A}
-.week-cal{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin-bottom:10px;background:#fff;padding:8px;border-radius:14px;border:1px solid #f0e8f5}
+.week-cal-wrap{display:flex;align-items:stretch;gap:4px;margin-bottom:10px;background:#fff;padding:6px;border-radius:14px;border:1px solid #f0e8f5}
+.week-nav-btn{width:28px;border:none;background:#FDF5FF;border-radius:8px;color:#9B8FAE;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700}
+.week-nav-btn:hover:not(:disabled){background:#F5F0FF;color:#FF8FAD}
+.week-nav-btn:disabled{opacity:0.3;cursor:not-allowed}
+.week-cal{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1}
 .week-cal::-webkit-scrollbar{display:none}
 .day-btn{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;padding:5px 2px;border-radius:10px;cursor:pointer;border:none;background:none;flex-shrink:0}
 .day-btn.active{background:linear-gradient(135deg,#FFB5C8,#C9B8FF)}
@@ -156,6 +160,11 @@ button,input,select{font-family:inherit;color:inherit}
 .nav-icon{font-size:20px}
 .nav-lbl{font-size:9px;color:#9B8FAE}
 .nav-btn.active .nav-lbl{color:#FF8FAD;font-weight:700}
+.quick-amount-btn{flex:1;padding:8px;border:1px solid #e8dcf5;border-radius:10px;background:#FDF5FF;color:#9B8FAE;font-size:13px;cursor:pointer;font-weight:500}
+.quick-amount-btn:hover{background:#F5F0FF;border-color:#C9B8FF;color:#FF8FAD}
+.period-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.period-tab{flex:1;min-width:0;padding:7px 6px;border:1px solid #e8dcf5;background:#fff;color:#9B8FAE;font-size:11px;border-radius:10px;cursor:pointer;font-family:inherit}
+.period-tab.active{background:linear-gradient(135deg,#FFB5C8,#C9B8FF);color:#fff;border-color:transparent;font-weight:700}
 .empty-text{text-align:center;color:#9B8FAE;font-size:13px;padding:16px 0}
 .reward-item{padding:10px 0;border-bottom:1px solid #f9f4ff}
 .reward-item:last-child{border-bottom:none}
@@ -189,7 +198,7 @@ button,input,select{font-family:inherit;color:inherit}
     </div>
     <div class="card"><div class="sec-title">カロリー</div>
       <div class="cal-big"><span id="calVal">0</span><span style="font-size:16px;color:#9B8FAE"> kcal</span></div>
-      <div class="cal-remain">目標 <span id="calTarget">1350</span> kcal ／ 残り <span id="calLeft" style="color:#FF8FAD;font-weight:700">1350</span> kcal</div>
+      <div class="cal-remain">目標 <span id="calTargetRange">1300〜1400</span> kcal ／ 残り <span id="calLeft" style="color:#FF8FAD;font-weight:700">--</span> kcal</div>
       <div class="prog-bar"><div class="prog-fill" id="calBar" style="width:0%;background:linear-gradient(90deg,#FFB5C8,#FF8FAD)"></div></div>
       <div class="pfc-grid">
         <div class="pfc-item"><div class="pfc-name">タンパク質</div><div class="pfc-val" style="color:#A08AFF" id="pVal">0g</div><div class="pfc-remain">目標 <span id="pTarget">79</span>g+</div></div>
@@ -203,6 +212,9 @@ button,input,select{font-family:inherit;color:inherit}
         <div class="steps-sub">目標 <span id="stepsTarget">7,000</span> 歩 ／ 残り <span id="stepsLeft" style="color:#5DCAA5;font-weight:700">--</span> 歩</div></div>
       </div>
       <div class="prog-bar" style="margin-top:8px"><div class="prog-fill" id="stepsBar" style="width:0%;background:linear-gradient(90deg,#B8F0E0,#5DCAA5)"></div></div>
+      <div style="font-size:11px;color:#9B8FAE;margin-top:8px;border-top:1px solid #f5edff;padding-top:6px">
+        平日（月〜金）平均: <span id="weekdayStepsAvg" style="font-weight:700;color:#5DCAA5">--</span> 歩
+      </div>
     </div>
     <div class="card">
       <div class="sec-title">📊 今週の平均カロリー（月〜日）</div>
@@ -219,7 +231,11 @@ button,input,select{font-family:inherit;color:inherit}
   </div>
 
   <div class="page" id="mealPage">
-    <div class="week-cal" id="weekCal"></div>
+    <div class="week-cal-wrap">
+      <button class="week-nav-btn" onclick="changeWeekOffset(-1)" id="prevWeekBtn">‹</button>
+      <div class="week-cal" id="weekCal"></div>
+      <button class="week-nav-btn" onclick="changeWeekOffset(1)" id="nextWeekBtn">›</button>
+    </div>
     <button class="coach-link" onclick="switchTab('coach',null);highlightCoach()">💬 コーチで食事を記録 →</button>
     <div id="mealAllSections"></div>
     <button class="add-btn" onclick="openFavPick()">⭐ お気に入りからクイック記録</button>
@@ -237,6 +253,7 @@ button,input,select{font-family:inherit;color:inherit}
       <div class="chip-row">
         <button class="chip" onclick="sendChip('今日の分析をお願い')">今日の分析</button>
         <button class="chip" onclick="sendChip('夜ご飯は何を食べればいい？')">夜ご飯は？</button>
+        <button class="chip" onclick="sendChip('残りの調整について相談したい')">残りの調整</button>
         <button class="chip" onclick="reshowCards()">📋 カード再表示</button>
         <button class="chip" style="margin-left:auto" onclick="clearChatHistory()">🗑 履歴クリア</button>
       </div>
@@ -251,15 +268,27 @@ button,input,select{font-family:inherit;color:inherit}
 
   <div class="page" id="graphPage">
     <div class="card">
+      <div class="period-tabs" id="periodTabs">
+        <button class="period-tab active" onclick="changePeriod(7)" data-period="7">7日</button>
+        <button class="period-tab" onclick="changePeriod(30)" data-period="30">30日</button>
+        <button class="period-tab" onclick="changePeriod(90)" data-period="90">90日（週平均）</button>
+        <button class="period-tab" onclick="changePeriod(365)" data-period="365">1年（月平均）</button>
+      </div>
+    </div>
+    <div class="card">
       <div style="display:flex;align-items:center;margin-bottom:8px">
-        <div class="sec-title" style="margin:0">体重推移（7日）</div>
+        <div class="sec-title" style="margin:0">体重・体脂肪率</div>
         <span class="graph-avg" id="weightAvg">--</span>
       </div>
       <svg class="weight-svg" id="weightSvg" viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet"></svg>
+      <div style="display:flex;gap:14px;font-size:10px;margin-top:6px;justify-content:center">
+        <span><span style="display:inline-block;width:10px;height:2px;background:#FF8FAD;vertical-align:middle"></span> 体重(kg)</span>
+        <span><span style="display:inline-block;width:10px;height:2px;background:#C9B8FF;vertical-align:middle"></span> 体脂肪率(%)</span>
+      </div>
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;margin-bottom:4px">
-        <div class="sec-title" style="margin:0">歩数（7日）</div>
+        <div class="sec-title" style="margin:0">歩数</div>
         <span class="graph-avg" id="stepsAvg">--</span>
       </div>
       <div class="mini-graph" id="stepsGraph"></div>
@@ -326,6 +355,23 @@ button,input,select{font-family:inherit;color:inherit}
   </div>
 </div>
 
+<div class="overlay" id="amountModal">
+  <div class="modal">
+    <div class="modal-title">量を変更</div>
+    <div style="text-align:center;font-size:14px;font-weight:500;margin-bottom:14px;color:#4A3F5C" id="amountModalName">--</div>
+    <div class="form-group"><label class="form-lbl">量 (%)</label>
+      <input class="form-input" type="number" id="amountModalInput" value="100">
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="quick-amount-btn" onclick="setQuickAmount(50)">50%</button>
+      <button class="quick-amount-btn" onclick="setQuickAmount(100)">100%</button>
+      <button class="quick-amount-btn" onclick="setQuickAmount(200)">200%</button>
+    </div>
+    <button class="btn-main" onclick="confirmAmountUpdate()">更新する</button>
+    <button class="btn-sub" onclick="closeModal('amountModal')">キャンセル</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -336,7 +382,8 @@ const S = {
   mealDbId:'81b87366-c4c4-4bf1-b714-fbd91e3b0867',
   favDbId:'70b5ecae-970c-4ff8-93ad-556740b345c9',
   rewardDbId:'763d21db-4317-4082-9c7b-c5afb1f41215',
-  goalCal:1350, goalPRatio:1.6, goalF:45, goalSteps:7000, height:159
+  goalCal:1350, goalCalMin:1300, goalCalMax:1400,
+  goalPRatio:1.6, goalF:45, goalSteps:7000, height:159
 };
 let meals=[], favorites=[], weekData=[], chatHistory=[];
 let rewards=[], dietGoals='';
@@ -350,6 +397,7 @@ let recCounter = 0;
 let imageDB = null;
 let selectedDate = '';  // 選択中の日付（食事タブ用）
 let weekCalories = [];  // 週ごとのカロリー
+let editingMealForAmount = null;
 
 function initImageDB(){
   return new Promise(resolve=>{
@@ -430,17 +478,27 @@ function saveSettings(){
   });
 }
 function refreshGoals(){
-  document.getElementById('goalCalDisp').textContent = S.goalCal;
+  document.getElementById('goalCalDisp').textContent = S.goalCalMin + '〜' + S.goalCalMax;
   document.getElementById('goalPRatioDisp').textContent = S.goalPRatio;
   document.getElementById('goalFDisp').textContent = S.goalF;
   document.getElementById('goalStepsDisp').textContent = S.goalSteps;
   document.getElementById('heightDisp').textContent = S.height;
   const w = todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
-  document.getElementById('calTarget').textContent = S.goalCal;
+  document.getElementById('calTargetRange').textContent = S.goalCalMin + '〜' + S.goalCalMax;
   document.getElementById('stepsTarget').textContent = S.goalSteps.toLocaleString();
   document.getElementById('pTarget').textContent = pGoal;
   document.getElementById('fTarget').textContent = S.goalF;
+}
+
+let weekOffset = 0; // 0=今週, -1=先週
+
+function changeWeekOffset(delta){
+  const newOffset = weekOffset + delta;
+  if(newOffset > 0) return; // 未来週は不可
+  if(newOffset < -1) return; // 2週間より前は不可
+  weekOffset = newOffset;
+  buildWeekCal();
 }
 
 function buildWeekCal(){
@@ -450,10 +508,10 @@ function buildWeekCal(){
   const days = ['月','火','水','木','金','土','日'];
   const today = new Date();
   // 今週の月曜日を取得
-  const dayOfWeek = today.getDay(); // 0=日, 1=月,...6=土
+  const dayOfWeek = today.getDay();
   const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(today);
-  monday.setDate(today.getDate() + offsetToMonday);
+  monday.setDate(today.getDate() + offsetToMonday + (weekOffset * 7));
 
   for(let i = 0; i < 7; i++){
     const d = new Date(monday); d.setDate(monday.getDate() + i);
@@ -473,6 +531,11 @@ function buildWeekCal(){
     };
     el.appendChild(b);
   }
+  // ナビボタン状態
+  const prevBtn = document.getElementById('prevWeekBtn');
+  const nextBtn = document.getElementById('nextWeekBtn');
+  if(prevBtn) prevBtn.disabled = weekOffset <= -1;
+  if(nextBtn) nextBtn.disabled = weekOffset >= 0;
 }
 
 async function notionFetch(url, options={}){
@@ -532,6 +595,7 @@ async function fetchWeekData(){
   weekData = d.results.map(r=>({
     date:r.properties['日付']?.date?.start,
     weight:r.properties['体重']?.number,
+    fat:r.properties['体脂肪率']?.number,
     steps:r.properties['歩数']?.number
   }));
 }
@@ -616,6 +680,7 @@ async function deleteMealRecord(id){
 }
 async function fetchGoalsFromProfile(){
   const profilePageId = '3553a7d6-c354-810c-86a8-c75db8003b3e';
+  let foundMin = false, foundMax = false;
   try {
     const d = await notionFetch(`https://api.notion.com/v1/blocks/${profilePageId}/children?page_size=100`);
     let inGoal = false;
@@ -656,6 +721,8 @@ async function fetchGoalsFromProfile(){
           const val = parseFloat(cells[1]?.[0]?.plain_text?.trim());
           if(isNaN(val)) continue;
           if(key === 'target_calorie') S.goalCal = val;
+          else if(key === 'target_calorie_min'){ S.goalCalMin = val; foundMin = true; }
+          else if(key === 'target_calorie_max'){ S.goalCalMax = val; foundMax = true; }
           else if(key === 'target_p_ratio') S.goalPRatio = val;
           else if(key === 'target_f') S.goalF = val;
           else if(key === 'target_steps') S.goalSteps = val;
@@ -665,6 +732,9 @@ async function fetchGoalsFromProfile(){
       }
     }
     dietGoals = goalParas.join('\n').trim();
+    // Notionにmin/max未定義ならtarget_calorie±50で補完
+    if(!foundMin) S.goalCalMin = S.goalCal - 50;
+    if(!foundMax) S.goalCalMax = S.goalCal + 50;
   } catch(e){ console.warn('goal fetch:', e); }
 }
 
@@ -737,6 +807,8 @@ async function fullSync(){
     setSync('ok');
     // 0時前後なら前日レポートを自動表示
     checkDailyReport();
+    // 古い食事記録の整理（バックグラウンド）
+    purgeOldMeals();
   } catch(e){ setSync('err'); throw e; }
 }
 
@@ -765,16 +837,25 @@ function refreshHome(){
     const r = m.amount/100;
     tCal += m.cal*r; tP += m.p*r; tF += m.f*r; tC += m.c*r;
   }
-  document.getElementById('calVal').textContent = Math.round(tCal);
-  document.getElementById('calLeft').textContent = Math.max(0, Math.round(S.goalCal-tCal));
-  document.getElementById('calBar').style.width = Math.min(100, tCal/S.goalCal*100)+'%';
-  document.getElementById('pVal').textContent = Math.round(tP)+'g';
-  document.getElementById('fVal').textContent = Math.round(tF)+'g';
-  document.getElementById('cVal').textContent = Math.round(tC)+'g';
+  document.getElementById('calVal').textContent = tCal.toFixed(1);
+  // 残り = max基準で計算（オーバー判定）
+  const calLeftMax = S.goalCalMax - tCal;
+  const calLeftEl = document.getElementById('calLeft');
+  if(calLeftMax < 0){
+    calLeftEl.textContent = Math.abs(calLeftMax).toFixed(1) + ' オーバー';
+    calLeftEl.style.color = '#E24B4A';
+  } else {
+    calLeftEl.textContent = calLeftMax.toFixed(1);
+    calLeftEl.style.color = '#FF8FAD';
+  }
+  document.getElementById('calBar').style.width = Math.min(100, tCal/S.goalCalMax*100)+'%';
+  document.getElementById('pVal').textContent = tP.toFixed(1)+'g';
+  document.getElementById('fVal').textContent = tF.toFixed(1)+'g';
+  document.getElementById('cVal').textContent = tC.toFixed(1)+'g';
   const w = todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
   const cGoal = Math.round((S.goalCal - pGoal*4 - S.goalF*9)/4);
-  document.getElementById('cLeft').textContent = Math.max(0, cGoal - Math.round(tC));
+  document.getElementById('cLeft').textContent = Math.max(0, cGoal - tC).toFixed(1);
   if(todayData.steps){
     document.getElementById('stepsVal').textContent = todayData.steps.toLocaleString();
     document.getElementById('stepsLeft').textContent = Math.max(0, S.goalSteps-todayData.steps).toLocaleString();
@@ -782,6 +863,19 @@ function refreshHome(){
   } else {
     document.getElementById('stepsVal').textContent = '--';
     document.getElementById('stepsLeft').textContent = '--';
+  }
+
+  // 平日（月〜金）平均歩数
+  const weekdaySteps = weekData.filter(d => {
+    if(!d.date || !d.steps) return false;
+    const wd = new Date(d.date).getDay();
+    return wd >= 1 && wd <= 5; // 月=1, 金=5
+  }).map(d => d.steps);
+  if(weekdaySteps.length){
+    const avg = Math.round(weekdaySteps.reduce((a,v)=>a+v,0) / weekdaySteps.length);
+    document.getElementById('weekdayStepsAvg').textContent = avg.toLocaleString();
+  } else {
+    document.getElementById('weekdayStepsAvg').textContent = '--';
   }
 
   // 週間平均カロリー
@@ -841,7 +935,7 @@ function refreshMeals(){
     }
     let html = `<div class="meal-section-head">
       <span class="meal-section-title">${cat}</span>
-      <span class="meal-section-sum">${Math.round(secCal)}kcal ・ P${Math.round(secP)} F${Math.round(secF)} C${Math.round(secC)}</span>
+      <span class="meal-section-sum">${secCal.toFixed(1)}kcal ・ P${secP.toFixed(1)} F${secF.toFixed(1)} C${secC.toFixed(1)}</span>
     </div>`;
     for(const m of filtered){
       const r = m.amount/100;
@@ -849,11 +943,11 @@ function refreshMeals(){
         <div class="meal-thumb">🍽</div>
         <div class="meal-info">
           <div class="meal-name">${escapeHtml(m.name)}</div>
-          <div class="meal-pfc">P:${Math.round(m.p*r)}g F:${Math.round(m.f*r)}g C:${Math.round(m.c*r)}g</div>
+          <div class="meal-pfc">P:${(m.p*r).toFixed(1)}g F:${(m.f*r).toFixed(1)}g C:${(m.c*r).toFixed(1)}g</div>
           <div class="meal-timing-tag">${m.timing}</div>
         </div>
         <div class="meal-actions">
-          <div class="meal-kcal">${Math.round(m.cal*r)} kcal</div>
+          <div class="meal-kcal">${(m.cal*r).toFixed(1)} kcal</div>
           <div class="meal-amount">${Math.round(m.amount)}%</div>
           <div class="meal-btns">
             <button class="icon-btn" onclick="editMealAmount('${m.id}')">±</button>
@@ -872,19 +966,32 @@ function refreshMeals(){
 async function editMealAmount(id){
   const meal = meals.find(m=> m.id===id);
   if(!meal) return;
-  const v = prompt('量を%で入力（現在: '+Math.round(meal.amount)+'%）', Math.round(meal.amount));
-  if(v === null) return;
-  const n = parseInt(v);
-  if(isNaN(n) || n<0) return;
+  editingMealForAmount = meal;
+  document.getElementById('amountModalName').textContent = meal.name;
+  document.getElementById('amountModalInput').value = Math.round(meal.amount);
+  openModal('amountModal');
+}
+
+function setQuickAmount(val){
+  document.getElementById('amountModalInput').value = val;
+}
+
+async function confirmAmountUpdate(){
+  if(!editingMealForAmount) return;
+  const meal = editingMealForAmount;
+  const n = parseInt(document.getElementById('amountModalInput').value);
+  if(isNaN(n) || n < 0){ showToast('正しい数値を入力してください'); return; }
+  closeModal('amountModal');
   meal.amount = n;
   try {
-    await notionFetch(`https://api.notion.com/v1/pages/${id}`,{
+    await notionFetch(`https://api.notion.com/v1/pages/${meal.id}`,{
       method:'PATCH',
       body: JSON.stringify({properties:{'量(%)':{number: n/100}}})
     });
     refreshMeals(); refreshHome();
     showToast('量を更新');
   } catch(e){ showToast('⚠️ '+e.message); }
+  editingMealForAmount = null;
 }
 async function confirmDeleteMeal(id){
   if(!confirm('この食事記録を削除しますか？')) return;
@@ -914,7 +1021,7 @@ function openFavPick(){
     item.innerHTML = `
       <div class="fav-list-info">
         <div class="fav-list-name">${escapeHtml(f.name)}</div>
-        <div class="fav-list-meta">${Math.round(f.cal)}kcal ／ P:${Math.round(f.p)}g F:${Math.round(f.f)}g C:${Math.round(f.c)}g ／ ${escapeHtml(f.category)}</div>
+        <div class="fav-list-meta">${f.cal.toFixed(1)}kcal ／ P:${f.p.toFixed(1)}g F:${f.f.toFixed(1)}g C:${f.c.toFixed(1)}g</div>
       </div>
       <div class="fav-list-arrow">›</div>
     `;
@@ -928,10 +1035,10 @@ function openFavConfirm(fav){
   document.getElementById('favConfirmContent').innerHTML = `
     <div style="text-align:center;margin-bottom:12px">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">${escapeHtml(fav.name)}</div>
-      <div style="font-size:12px;color:#9B8FAE">1人前 ${Math.round(fav.cal)}kcal P${Math.round(fav.p)}g F${Math.round(fav.f)}g C${Math.round(fav.c)}g</div>
+      <div style="font-size:12px;color:#9B8FAE">1人前 ${fav.cal.toFixed(1)}kcal P${fav.p.toFixed(1)}g F${fav.f.toFixed(1)}g C${fav.c.toFixed(1)}g</div>
     </div>
   `;
-  document.getElementById('favConfirmTiming').value = fav.category || inferTimingFromHour();
+  document.getElementById('favConfirmTiming').value = inferTimingFromHour();
   document.getElementById('favConfirmAmount').value = Math.round(fav.defaultAmount);
   openModal('favConfirmModal');
 }
@@ -958,13 +1065,49 @@ function highlightCoach(){
   setTimeout(()=> document.getElementById('chatInput')?.focus(), 100);
 }
 
+// 軽量マークダウンレンダラ（Bot返答用）
+function renderMarkdown(text){
+  if(!text) return '';
+  // エスケープ
+  let html = text
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+  // コードブロック ```...```
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) =>
+    '<pre style="background:#FDF5FF;padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;margin:6px 0">' + code.trim() + '</pre>'
+  );
+  // インラインコード `code`
+  html = html.replace(/`([^`\n]+)`/g, '<code style="background:#FDF5FF;padding:1px 5px;border-radius:4px;font-size:11px">$1</code>');
+  // 見出し ### H3 / ## H2 / # H1
+  html = html.replace(/^### (.+)$/gm, '<div style="font-size:13px;font-weight:700;margin:8px 0 4px;color:#FF8FAD">$1</div>');
+  html = html.replace(/^## (.+)$/gm, '<div style="font-size:14px;font-weight:700;margin:8px 0 4px;color:#FF8FAD">$1</div>');
+  html = html.replace(/^# (.+)$/gm, '<div style="font-size:15px;font-weight:700;margin:8px 0 4px;color:#FF8FAD">$1</div>');
+  // 太字 **text** または __text__
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  // 斜体 *text*
+  html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+  // 番号付きリスト 1. xxx
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="margin-left:14px;text-indent:-14px">$1. $2</div>');
+  // 箇条書き - xxx / * xxx
+  html = html.replace(/^[-*] (.+)$/gm, '<div style="margin-left:14px;text-indent:-14px">・ $1</div>');
+  // リンク [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#A08AFF;text-decoration:underline">$1</a>');
+  // 改行
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 function addBubble(role, text, opts){
   const h = document.getElementById('coachHistory');
   const loading = document.getElementById('coachLoading');
   if(loading) loading.style.display = 'none';
   const div = document.createElement('div');
   div.className = 'bubble ' + role;
-  let inner = `<div class="bubble-inner">${escapeHtml(text).replace(/\n/g,'<br>')}`;
+  // ユーザー発言はそのまま、Bot発言はマークダウンレンダリング
+  const content = role === 'bot' ? renderMarkdown(text) : escapeHtml(text).replace(/\n/g,'<br>');
+  let inner = `<div class="bubble-inner">${content}`;
   if(opts?.imageUrl) inner += `<img class="user-photo" src="${opts.imageUrl}">`;
   inner += '</div>';
   div.innerHTML = inner;
@@ -1009,7 +1152,70 @@ function clearChatHistory(){
   initCoach();
 }
 
-// 日次レポート: 0時を跨いだら前日の振り返りを自動表示
+// 2週間より古い食事記録を削除
+async function purgeOldMeals(){
+  // 14日前の日付（今日含めず）
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+
+  try {
+    // 古い食事を全件取得
+    let oldMeals = [];
+    let hasMore = true;
+    let cursor = undefined;
+    while(hasMore){
+      const body = {
+        filter:{property:'日付', date:{before: cutoffStr}},
+        page_size: 100
+      };
+      if(cursor) body.start_cursor = cursor;
+      const d = await notionFetch(`https://api.notion.com/v1/databases/${S.mealDbId}/query`,{
+        method:'POST',
+        body: JSON.stringify(body)
+      });
+      oldMeals = oldMeals.concat(d.results);
+      hasMore = d.has_more;
+      cursor = d.next_cursor;
+      if(oldMeals.length > 500) break; // 安全上限
+    }
+
+    if(!oldMeals.length) return;
+
+    // 初回は確認ダイアログ
+    const confirmed = localStorage.getItem('dietApp_purgeConfirmed') === 'yes';
+    if(!confirmed){
+      const ok = confirm(
+        `📦 古い食事記録の整理\n\n` +
+        `${cutoffStr}より前の食事記録 ${oldMeals.length}件 をNotionから完全削除します。\n` +
+        `これは2週間より前の記録で、今後はアプリ起動時に自動削除されます。\n\n` +
+        `削除を実行しますか？\n` +
+        `（OK: 削除＋以降は自動 / キャンセル: 今回はスキップ）`
+      );
+      if(!ok) return;
+      localStorage.setItem('dietApp_purgeConfirmed', 'yes');
+    }
+
+    // バックグラウンドで削除
+    setSync('');
+    let deleted = 0;
+    for(const m of oldMeals){
+      try {
+        await notionFetch(`https://api.notion.com/v1/pages/${m.id}`,{
+          method:'PATCH',
+          body: JSON.stringify({archived: true})
+        });
+        deleted++;
+      } catch(e){ console.warn('削除失敗:', m.id, e); }
+    }
+    if(deleted > 0){
+      console.log(`✓ 古い食事記録 ${deleted}件 を削除しました`);
+      showToast(`📦 古い記録 ${deleted}件 を整理しました`);
+    }
+  } catch(e){
+    console.warn('purgeOldMeals failed:', e);
+  }
+}
 async function checkDailyReport(){
   const today = todayStr();
   const lastReport = localStorage.getItem('dietApp_lastReport') || '';
@@ -1057,14 +1263,24 @@ async function checkDailyReport(){
   let totCal=0, totP=0, totF=0, totC=0;
   for(const m of yMeals){ totCal+=m.cal; totP+=m.p; totF+=m.f; totC+=m.c; }
   let mealsSummary = '';
-  for(const m of yMeals) mealsSummary += `- [${m.timing}] ${m.name} (${Math.round(m.cal)}kcal)\n`;
+  for(const m of yMeals) mealsSummary += `- [${m.timing}] ${m.name} (${m.cal.toFixed(1)}kcal)\n`;
+
+  // 平日（月〜金）の平均歩数を計算
+  const weekdaySteps = weekData.filter(d => {
+    if(!d.date || !d.steps) return false;
+    const wd = new Date(d.date).getDay();
+    return wd >= 1 && wd <= 5;
+  }).map(d => d.steps);
+  const weekdayAvg = weekdaySteps.length ?
+    Math.round(weekdaySteps.reduce((a,v)=>a+v,0) / weekdaySteps.length) : 0;
 
   const w = yWeight || todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
   const reportPrompt = `__DAILY_REPORT__ 昨日(${yStr})の記録:
-体重: ${yWeight || '記録なし'}kg / 体脂肪率: ${yFat || '?'}% / 歩数: ${ySteps?.toLocaleString() || '?'}歩
-カロリー: ${Math.round(totCal)}/${S.goalCal}kcal
-PFC: P${Math.round(totP)}/${pGoal}g+ F${Math.round(totF)}/${S.goalF}g C${Math.round(totC)}g
+体重: ${yWeight || '記録なし'}kg ／ 歩数: ${ySteps?.toLocaleString() || '?'}歩
+平日平均歩数（直近7日）: ${weekdayAvg.toLocaleString()}歩 / 目標${S.goalSteps.toLocaleString()}歩
+カロリー: ${totCal.toFixed(1)}/${S.goalCalMin}〜${S.goalCalMax}kcal
+PFC: P${totP.toFixed(1)}/${pGoal}g+ F${totF.toFixed(1)}/${S.goalF}g C${totC.toFixed(1)}g
 食事:
 ${mealsSummary || '(記録なし)'}
 
@@ -1099,8 +1315,13 @@ ${mealsSummary || '(記録なし)'}
 
   try {
     const sys = `あなたはほし(Cherubi)さんのフレンドリーなダイエットコーチです。
-プロフィール: 身長${S.height}cm、目標体重48kg、目標体脂肪率22%
+プロフィール: 身長${S.height}cm、現在の主目標は体重48kg達成。
 PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
+
+【重要】
+- **体脂肪率には触れないでください**（48kg達成までは体重最優先）
+- 歩数は1日単位ではなく**平日平均で評価**してください（休日は少なくてOK）
+- マークダウン記法は使わない。プレーンテキストで改行と絵文字で整える
 
 ユーザーから __DAILY_REPORT__ で始まるメッセージが来た場合、昨日の振り返りと今日のアドバイスを以下の構成で短くまとめてください：
 1. 昨日の良かったこと（褒める）
@@ -1245,17 +1466,22 @@ async function sendChat(){
 
   const ctx = buildCoachContext();
   const sys = `あなたはほし(Cherubi)さんのフレンドリーなダイエットコーチです。
-ユーザーのプロフィール: 身長${S.height}cm、目標体重48kg、目標体脂肪率22%
+ユーザーのプロフィール: 身長${S.height}cm、目標体重48kg
 今日の状況:
 - 体重 ${todayData.weight || '?'}kg、体脂肪率 ${todayData.fat || '?'}%
-- カロリー ${ctx.tCal}/${S.goalCal}kcal
-- タンパク質 ${ctx.tP}/${ctx.pGoal}g以上（最優先）
-- 脂質 ${ctx.tF}/${S.goalF}g
-- 炭水化物 ${ctx.tC}g
-- 歩数 ${ctx.steps}/${S.goalSteps}歩
+- カロリー ${ctx.tCal.toFixed(1)}/${S.goalCalMin}〜${S.goalCalMax}kcal（範囲内が理想）
+- タンパク質 ${ctx.tP.toFixed(1)}/${ctx.pGoal}g以上（最優先）
+- 脂質 ${ctx.tF.toFixed(1)}/${S.goalF}g
+- 炭水化物 ${ctx.tC.toFixed(1)}g
+- 歩数 ${ctx.steps}歩（目標${S.goalSteps}歩・平日平均で見る）
 - 今日の食事:\n${ctx.mealsText}
 
 PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
+歩数は1日単位ではなく週間平均で評価する（休日は少なくてOK）。
+**現在の主目標は48kgの体重達成です。体脂肪率については48kg達成まで言及しないでください**（聞かれた時だけ答える）。
+
+【出力形式】
+プレーンテキストで返答してください。**マークダウン記法（# 見出し、**太字**、- リスト等）は使わない**こと。改行と絵文字で読みやすく整えてください。
 
 【重要：食事記録の処理】
 ユーザーが食べた/食べる予定の食事を伝えてきた場合（写真や説明）、料理ごとに以下のJSON形式で食事候補を提案してください。短いコメントとともに、必ず最後に <meal_data>...</meal_data> タグで囲んで出力してください。
@@ -1265,18 +1491,25 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 </meal_data>
 
 複数の料理がある場合は配列に複数入れる。
-- cal/p/f/c は1人前あたりの推定値
+- cal/p/f/c は1人前あたりの推定値（小数点1桁まで）
 - timing はユーザーの発言から推測（指定なければ現在時刻から推測）
 - amount は実際食べた量を%で。「半分残した」なら50、特に指定なければ100
 
 【固有名詞・チェーン店メニュー対応】
-ユーザーが「コメダ」「マック」「サイゼ」などのチェーン店名や、特定の商品名（例：「シロノワール」「ビッグマック」）を言った場合は、web_searchツールを使って公式の栄養成分情報を検索してから、正確な数値を含む<meal_data>を出力してください。
+ユーザーが「コメダ」「マック」「サイゼ」などのチェーン店名や、特定の商品名を言った場合は、web_searchツールを使って公式の栄養成分情報を検索してから、正確な数値を含む<meal_data>を出力してください。
 
 【URL対応】
 ユーザーがURLを貼った場合、web_searchツールで内容を確認してから、レシピならカロリー計算、メニュー情報なら栄養素抽出をして<meal_data>を作ってください。
 
 【特殊命令: __RESHOW_CARDS__】
-このメッセージが来た場合、直近の会話履歴を遡って、まだ記録されていない食事候補があれば<meal_data>として再出力してください。「以下の食事を再表示します」というコメントを添えてください。記録済みかどうかの判断は、最近の会話の流れから判断してください。
+このメッセージが来た場合、直近の会話履歴を遡って、まだ記録されていない食事候補があれば<meal_data>として再出力してください。「以下の食事を再表示します」というコメントを添えてください。
+
+【「残りの調整」リクエスト】
+「残りの調整」と言われたら、現在の摂取量を踏まえて、残りで何をどれくらい食べるべきかを提案してください。
+- カロリー目標範囲内（${S.goalCalMin}〜${S.goalCalMax}kcal）に収まるか
+- タンパク質目標（${ctx.pGoal}g以上）達成のために何が必要か
+- 具体的な食材・量で提案
+- すでに目標達成しているならそれも伝える
 
 ただし、相談・質問・アドバイス依頼の場合（「今日の分析」「夜何食べる？」など）は<meal_data>を出さず普通に答えるだけにしてください。`;
 
@@ -1486,33 +1719,193 @@ function reshowCards(){
   sendChat();
 }
 
-function renderGraphs(){
-  if(!weekData.length){
-    ['weightAvg','stepsAvg'].forEach(id => document.getElementById(id).textContent = 'データなし');
+let currentPeriod = 7;
+let extendedData = null; // 30/90/365日分のキャッシュ
+
+async function changePeriod(days){
+  currentPeriod = days;
+  document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.period-tab[data-period="${days}"]`)?.classList.add('active');
+  await loadGraphData(days);
+  renderGraphs();
+}
+
+async function loadGraphData(days){
+  if(days === 7){
+    // 既にfetchWeekDataで取得済み
+    extendedData = null;
     return;
   }
-  const ws = weekData.filter(d=> d.weight);
+  // 30/90/365日分を取得
+  const start = new Date();
+  start.setDate(start.getDate() - days + 1);
+  const startStr = start.toISOString().slice(0,10);
+
+  setSync('');
+  try {
+    let allData = [];
+    let hasMore = true, cursor;
+    while(hasMore){
+      const body = {
+        filter:{property:'日付', date:{on_or_after: startStr}},
+        sorts:[{property:'日付', direction:'ascending'}],
+        page_size: 100
+      };
+      if(cursor) body.start_cursor = cursor;
+      const d = await notionFetch(`https://api.notion.com/v1/databases/${S.dbId}/query`,{
+        method:'POST',
+        body: JSON.stringify(body)
+      });
+      allData = allData.concat(d.results.map(r=>({
+        date: r.properties['日付']?.date?.start,
+        weight: r.properties['体重']?.number,
+        fat: r.properties['体脂肪率']?.number,
+        steps: r.properties['歩数']?.number
+      })));
+      hasMore = d.has_more;
+      cursor = d.next_cursor;
+      if(allData.length > 500) break;
+    }
+    extendedData = allData;
+    setSync('ok');
+  } catch(e){
+    setSync('err');
+    showToast('⚠️ データ取得失敗: ' + e.message);
+  }
+}
+
+// データを期間に応じて集計
+function aggregateData(data, days){
+  if(days === 7 || days === 30){
+    return data.map(d => ({
+      label: d.date,
+      weight: d.weight,
+      fat: d.fat,
+      steps: d.steps
+    }));
+  }
+  // 90日: 週平均
+  if(days === 90){
+    const byWeek = {};
+    for(const d of data){
+      if(!d.date) continue;
+      const dt = new Date(d.date);
+      const dayOfWeek = dt.getDay();
+      const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(dt);
+      monday.setDate(dt.getDate() + offsetToMonday);
+      const key = monday.toISOString().slice(0,10);
+      if(!byWeek[key]) byWeek[key] = {w:[], f:[], s:[]};
+      if(d.weight) byWeek[key].w.push(d.weight);
+      if(d.fat) byWeek[key].f.push(d.fat);
+      if(d.steps) byWeek[key].s.push(d.steps);
+    }
+    return Object.entries(byWeek).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({
+      label: k,
+      weight: v.w.length ? v.w.reduce((a,x)=>a+x,0)/v.w.length : null,
+      fat: v.f.length ? v.f.reduce((a,x)=>a+x,0)/v.f.length : null,
+      steps: v.s.length ? Math.round(v.s.reduce((a,x)=>a+x,0)/v.s.length) : null
+    }));
+  }
+  // 1年: 月平均
+  if(days === 365){
+    const byMonth = {};
+    for(const d of data){
+      if(!d.date) continue;
+      const key = d.date.slice(0,7); // YYYY-MM
+      if(!byMonth[key]) byMonth[key] = {w:[], f:[], s:[]};
+      if(d.weight) byMonth[key].w.push(d.weight);
+      if(d.fat) byMonth[key].f.push(d.fat);
+      if(d.steps) byMonth[key].s.push(d.steps);
+    }
+    return Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({
+      label: k,
+      weight: v.w.length ? v.w.reduce((a,x)=>a+x,0)/v.w.length : null,
+      fat: v.f.length ? v.f.reduce((a,x)=>a+x,0)/v.f.length : null,
+      steps: v.s.length ? Math.round(v.s.reduce((a,x)=>a+x,0)/v.s.length) : null
+    }));
+  }
+  return data;
+}
+
+function renderGraphs(){
+  const sourceData = extendedData || weekData;
+  const aggregated = aggregateData(sourceData, currentPeriod);
+
+  // 体重・体脂肪率のオーバーレイ
+  const ws = aggregated.filter(d => d.weight !== null && d.weight !== undefined);
+  const fs = aggregated.filter(d => d.fat !== null && d.fat !== undefined);
   if(ws.length){
     const avg = ws.reduce((a,d)=>a+d.weight,0)/ws.length;
-    document.getElementById('weightAvg').textContent = '平均 '+avg.toFixed(1)+'kg';
-    const mn = Math.min(...ws.map(d=>d.weight))-0.3;
-    const mx = Math.max(...ws.map(d=>d.weight))+0.3;
+    let avgLabel = '体重平均 ' + avg.toFixed(1) + 'kg';
+    if(fs.length){
+      const fAvg = fs.reduce((a,d)=>a+d.fat,0)/fs.length;
+      avgLabel += ' / 体脂肪率 ' + fAvg.toFixed(1) + '%';
+    }
+    document.getElementById('weightAvg').textContent = avgLabel;
+
+    // 体重スケール
+    const wMin = Math.min(...ws.map(d=>d.weight))-0.3;
+    const wMax = Math.max(...ws.map(d=>d.weight))+0.3;
+    const wRange = wMax - wMin || 1;
+    // 体脂肪率スケール（独立軸）
+    let fMin = 0, fRange = 1;
+    if(fs.length){
+      fMin = Math.min(...fs.map(d=>d.fat))-1;
+      const fMax = Math.max(...fs.map(d=>d.fat))+1;
+      fRange = fMax - fMin || 1;
+    }
+
     const svg = document.getElementById('weightSvg');
-    const pts = ws.map((d,i)=> `${i/(ws.length-1||1)*280+10},${80-(d.weight-mn)/(mx-mn||1)*70}`).join(' ');
-    let html = `<polyline points="${pts}" fill="none" stroke="#FFB5C8" stroke-width="2.5" stroke-linejoin="round"/>`;
-    ws.forEach((d,i)=>{
-      const x = i/(ws.length-1||1)*280+10;
-      const y = 80-(d.weight-mn)/(mx-mn||1)*70;
-      html += `<circle cx="${x}" cy="${y}" r="3.5" fill="#FF8FAD"/><text x="${x}" y="${y-8}" text-anchor="middle" font-size="9" fill="#9B8FAE">${d.weight.toFixed(1)}</text>`;
+    const n = aggregated.length;
+    const xStep = n > 1 ? 280/(n-1) : 0;
+
+    let html = '';
+    // 体脂肪率の折れ線（薄め）
+    if(fs.length > 1){
+      const fpts = aggregated.map((d,i)=>{
+        if(d.fat == null) return null;
+        const x = i*xStep + 10;
+        const y = 80 - (d.fat-fMin)/fRange*70;
+        return `${x},${y}`;
+      }).filter(p=>p);
+      html += `<polyline points="${fpts.join(' ')}" fill="none" stroke="#C9B8FF" stroke-width="1.5" stroke-dasharray="3,2" stroke-linejoin="round" opacity="0.6"/>`;
+    }
+    // 体重の折れ線
+    if(ws.length > 1){
+      const wpts = aggregated.map((d,i)=>{
+        if(d.weight == null) return null;
+        const x = i*xStep + 10;
+        const y = 80 - (d.weight-wMin)/wRange*70;
+        return `${x},${y}`;
+      }).filter(p=>p);
+      html += `<polyline points="${wpts.join(' ')}" fill="none" stroke="#FFB5C8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    }
+    // 体重の点とラベル（密な期間ではラベル省略）
+    const showLabels = n <= 14;
+    aggregated.forEach((d,i)=>{
+      if(d.weight == null) return;
+      const x = i*xStep + 10;
+      const y = 80 - (d.weight-wMin)/wRange*70;
+      html += `<circle cx="${x}" cy="${y}" r="${n>30?2:3.5}" fill="#FF8FAD"/>`;
+      if(showLabels){
+        html += `<text x="${x}" y="${y-8}" text-anchor="middle" font-size="9" fill="#9B8FAE">${d.weight.toFixed(1)}</text>`;
+      }
     });
     svg.innerHTML = html;
   } else {
     document.getElementById('weightSvg').innerHTML = '';
     document.getElementById('weightAvg').textContent = 'データなし';
   }
-  renderBarGraph('stepsGraph','stepsAvg', weekData.map(d=>d.steps||0), S.goalSteps, '歩', '#B8F0E0');
+
+  // 歩数バーグラフ
+  renderBarGraph('stepsGraph','stepsAvg',
+    aggregated.map(d=>d.steps||0),
+    aggregated.map(d=>d.label),
+    S.goalSteps, '歩', '#B8F0E0', currentPeriod);
 }
-function renderBarGraph(cid, avgId, vals, goal, unit, col){
+
+function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
   const el = document.getElementById(cid);
   if(!vals.length){ el.innerHTML=''; return; }
   const mx = Math.max(...vals, goal)*1.15 || 100;
@@ -1520,12 +1913,17 @@ function renderBarGraph(cid, avgId, vals, goal, unit, col){
   const av = nonz.length ? Math.round(nonz.reduce((a,v)=>a+v,0)/nonz.length) : 0;
   document.getElementById(avgId).textContent = '平均 '+(av||'--').toLocaleString()+unit;
   const days = ['日','月','火','水','木','金','土'];
+  const showLabel = vals.length <= 14;
   el.innerHTML = vals.map((v,i)=>{
     const h = Math.max(4, v/mx*60);
-    const d = weekData[i]?.date ? new Date(weekData[i].date) : null;
-    const lbl = d ? days[d.getDay()] : '';
+    let lbl = '';
+    if(showLabel && labels[i]){
+      const dt = new Date(labels[i]);
+      if(period === 7 || period === 30) lbl = days[dt.getDay()];
+      else lbl = labels[i].slice(5);
+    }
     return `<div class="bar-wrap">
-      <span class="bar-val">${v>0 ? Math.round(v).toLocaleString() : ''}</span>
+      <span class="bar-val">${v>0 && vals.length<=14 ? Math.round(v).toLocaleString() : ''}</span>
       <div class="bar" style="height:${h}px;background:${col}"></div>
       <span class="bar-lbl">${lbl}</span>
     </div>`;
@@ -1548,7 +1946,14 @@ function switchTab(tab, btn){
   } else {
     const pg = document.getElementById(tab+'Page');
     if(pg) pg.classList.add('active');
-    if(tab === 'graph') renderGraphs();
+    if(tab === 'graph'){
+      // 期間が7日以外で初回ならデータ取得が必要
+      if(currentPeriod !== 7 && !extendedData){
+        loadGraphData(currentPeriod).then(()=> renderGraphs());
+      } else {
+        renderGraphs();
+      }
+    }
     if(tab === 'meal') refreshMeals();
   }
 }
