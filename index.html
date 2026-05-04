@@ -205,6 +205,10 @@ button,input,select{font-family:inherit;color:inherit}
         <div class="pfc-item"><div class="pfc-name">脂質</div><div class="pfc-val" style="color:#FF8FAD" id="fVal">0g</div><div class="pfc-remain">目標 <span id="fTarget">45</span>g</div></div>
         <div class="pfc-item"><div class="pfc-name">炭水化物</div><div class="pfc-val" style="color:#5DCAA5" id="cVal">0g</div><div class="pfc-remain">残り <span id="cLeft">--</span>g</div></div>
       </div>
+      <div style="font-size:11px;color:#9B8FAE;margin-top:10px;border-top:1px solid #f5edff;padding-top:8px">
+        今週（月〜日）平均: <span id="weeklyAvgCal" style="font-weight:700;color:#FF8FAD">--</span> kcal/日
+        <span id="weeklyDays" style="margin-left:6px">--日分</span>
+      </div>
     </div>
     <div class="card"><div class="sec-title">歩数</div>
       <div class="steps-row"><div class="steps-icon">👟</div>
@@ -213,16 +217,8 @@ button,input,select{font-family:inherit;color:inherit}
       </div>
       <div class="prog-bar" style="margin-top:8px"><div class="prog-fill" id="stepsBar" style="width:0%;background:linear-gradient(90deg,#B8F0E0,#5DCAA5)"></div></div>
       <div style="font-size:11px;color:#9B8FAE;margin-top:8px;border-top:1px solid #f5edff;padding-top:6px">
-        平日（月〜金）平均: <span id="weekdayStepsAvg" style="font-weight:700;color:#5DCAA5">--</span> 歩
+        今週（月〜日）平均: <span id="weekdayStepsAvg" style="font-weight:700;color:#5DCAA5">--</span> 歩
       </div>
-    </div>
-    <div class="card">
-      <div class="sec-title">📊 今週の平均カロリー（月〜日）</div>
-      <div style="display:flex;align-items:baseline;gap:6px">
-        <div style="font-size:24px;font-weight:700" id="weeklyAvgCal">--</div>
-        <div style="font-size:13px;color:#9B8FAE">kcal/日</div>
-      </div>
-      <div style="font-size:11px;color:#9B8FAE;margin-top:4px" id="weeklyDays">--日分のデータ</div>
     </div>
     <div class="card" id="rewardCard" style="display:none">
       <div class="sec-title">🎁 ご褒美リスト</div>
@@ -280,7 +276,10 @@ button,input,select{font-family:inherit;color:inherit}
         <div class="sec-title" style="margin:0">体重・体脂肪率</div>
         <span class="graph-avg" id="weightAvg">--</span>
       </div>
-      <svg class="weight-svg" id="weightSvg" viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet"></svg>
+      <div style="position:relative">
+        <svg class="weight-svg" id="weightSvg" viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="graphTooltip" style="display:none;position:absolute;background:#4A3F5C;color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;pointer-events:none;z-index:10;line-height:1.5;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15)"></div>
+      </div>
       <div style="display:flex;gap:14px;font-size:10px;margin-top:6px;justify-content:center">
         <span><span style="display:inline-block;width:10px;height:2px;background:#FF8FAD;vertical-align:middle"></span> 体重(kg)</span>
         <span><span style="display:inline-block;width:10px;height:2px;background:#C9B8FF;vertical-align:middle"></span> 体脂肪率(%)</span>
@@ -428,7 +427,15 @@ function getImageDB(id){
   });
 }
 
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+// 日本時間ベースの日付文字列（YYYY-MM-DD）
+function localDateStr(d){
+  const dt = d || new Date();
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth()+1).padStart(2,'0');
+  const day = String(dt.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function todayStr(){ return localDateStr(); }
 function escapeHtml(s){
   if(!s) return '';
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -515,7 +522,7 @@ function buildWeekCal(){
 
   for(let i = 0; i < 7; i++){
     const d = new Date(monday); d.setDate(monday.getDate() + i);
-    const dStr = d.toISOString().slice(0,10);
+    const dStr = localDateStr(d);
     const isToday = dStr === todayStr();
     const isFuture = d > today;
     const b = document.createElement('button');
@@ -559,7 +566,7 @@ async function notionFetch(url, options={}){
 async function fetchTodayWeight(){
   const today = todayStr();
   const yest = new Date(); yest.setDate(yest.getDate()-1);
-  const yStr = yest.toISOString().slice(0,10);
+  const yStr = localDateStr(yest);
   const d = await notionFetch(`https://api.notion.com/v1/databases/${S.dbId}/query`,{
     method:'POST',
     body: JSON.stringify({
@@ -575,7 +582,8 @@ async function fetchTodayWeight(){
     if(tdy){
       const p = tdy.properties;
       todayData.weight = p['体重']?.number;
-      todayData.fat = p['体脂肪率']?.number;
+      const fatVal = p['体脂肪率']?.number;
+      todayData.fat = (fatVal && fatVal > 0) ? fatVal : null;
       todayData.bmi = p['BMI']?.formula?.number;
       todayData.steps = p['歩数']?.number;
     }
@@ -588,16 +596,19 @@ async function fetchWeekData(){
   const d = await notionFetch(`https://api.notion.com/v1/databases/${S.dbId}/query`,{
     method:'POST',
     body: JSON.stringify({
-      filter:{property:'日付', date:{on_or_after: start.toISOString().slice(0,10)}},
+      filter:{property:'日付', date:{on_or_after: localDateStr(start)}},
       sorts:[{property:'日付', direction:'ascending'}]
     })
   });
-  weekData = d.results.map(r=>({
-    date:r.properties['日付']?.date?.start,
-    weight:r.properties['体重']?.number,
-    fat:r.properties['体脂肪率']?.number,
-    steps:r.properties['歩数']?.number
-  }));
+  weekData = d.results.map(r=>{
+    const fatVal = r.properties['体脂肪率']?.number;
+    return {
+      date:r.properties['日付']?.date?.start,
+      weight:r.properties['体重']?.number,
+      fat:(fatVal && fatVal > 0) ? fatVal : null,
+      steps:r.properties['歩数']?.number
+    };
+  });
 }
 async function fetchMealsForDate(dateStr){
   const target = dateStr || todayStr();
@@ -767,7 +778,7 @@ async function fetchWeeklyCalories(){
   const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(today);
   monday.setDate(today.getDate() + offsetToMonday);
-  const mondayStr = monday.toISOString().slice(0,10);
+  const mondayStr = localDateStr(monday);
 
   try {
     const d = await notionFetch(`https://api.notion.com/v1/databases/${S.mealDbId}/query`,{
@@ -865,14 +876,20 @@ function refreshHome(){
     document.getElementById('stepsLeft').textContent = '--';
   }
 
-  // 平日（月〜金）平均歩数
-  const weekdaySteps = weekData.filter(d => {
+  // 今週（月〜日）平均歩数
+  // 今週の月曜日を計算
+  const todayDt = new Date();
+  const dayOfWeek = todayDt.getDay();
+  const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisMonday = new Date(todayDt);
+  thisMonday.setDate(todayDt.getDate() + offsetToMonday);
+  const thisMondayStr = localDateStr(thisMonday);
+  const thisWeekSteps = weekData.filter(d => {
     if(!d.date || !d.steps) return false;
-    const wd = new Date(d.date).getDay();
-    return wd >= 1 && wd <= 5; // 月=1, 金=5
+    return d.date >= thisMondayStr;
   }).map(d => d.steps);
-  if(weekdaySteps.length){
-    const avg = Math.round(weekdaySteps.reduce((a,v)=>a+v,0) / weekdaySteps.length);
+  if(thisWeekSteps.length){
+    const avg = Math.round(thisWeekSteps.reduce((a,v)=>a+v,0) / thisWeekSteps.length);
     document.getElementById('weekdayStepsAvg').textContent = avg.toLocaleString();
   } else {
     document.getElementById('weekdayStepsAvg').textContent = '--';
@@ -882,10 +899,10 @@ function refreshHome(){
   if(weekCalories.length){
     const avg = Math.round(weekCalories.reduce((a,d)=>a+d.cal,0) / weekCalories.length);
     document.getElementById('weeklyAvgCal').textContent = avg.toLocaleString();
-    document.getElementById('weeklyDays').textContent = weekCalories.length + '日分のデータ';
+    document.getElementById('weeklyDays').textContent = '(' + weekCalories.length + '日分)';
   } else {
     document.getElementById('weeklyAvgCal').textContent = '--';
-    document.getElementById('weeklyDays').textContent = 'まだデータがありません';
+    document.getElementById('weeklyDays').textContent = '';
   }
 
   // ごほうびリスト
@@ -1157,7 +1174,7 @@ async function purgeOldMeals(){
   // 14日前の日付（今日含めず）
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 14);
-  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const cutoffStr = localDateStr(cutoff);
 
   try {
     // 古い食事を全件取得
@@ -1224,7 +1241,7 @@ async function checkDailyReport(){
 
   // 昨日の日付
   const y = new Date(); y.setDate(y.getDate()-1);
-  const yStr = y.toISOString().slice(0,10);
+  const yStr = localDateStr(y);
 
   // 昨日のデータを取得
   let yMeals = [], yWeight = null, yFat = null, ySteps = null;
@@ -1248,7 +1265,8 @@ async function checkDailyReport(){
     if(wd.results.length){
       const p = wd.results[0].properties;
       yWeight = p['体重']?.number;
-      yFat = p['体脂肪率']?.number;
+      const yFatVal = p['体脂肪率']?.number;
+      yFat = (yFatVal && yFatVal > 0) ? yFatVal : null;
       ySteps = p['歩数']?.number;
     }
   } catch(e){ console.warn('昨日のデータ取得失敗:', e); return; }
@@ -1265,20 +1283,25 @@ async function checkDailyReport(){
   let mealsSummary = '';
   for(const m of yMeals) mealsSummary += `- [${m.timing}] ${m.name} (${m.cal.toFixed(1)}kcal)\n`;
 
-  // 平日（月〜金）の平均歩数を計算
-  const weekdaySteps = weekData.filter(d => {
+  // 今週（月〜日）の平均歩数を計算
+  const todayDt = new Date();
+  const dayOfWeek = todayDt.getDay();
+  const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisMonday = new Date(todayDt);
+  thisMonday.setDate(todayDt.getDate() + offsetToMonday);
+  const thisMondayStr = localDateStr(thisMonday);
+  const thisWeekSteps = weekData.filter(d => {
     if(!d.date || !d.steps) return false;
-    const wd = new Date(d.date).getDay();
-    return wd >= 1 && wd <= 5;
+    return d.date >= thisMondayStr;
   }).map(d => d.steps);
-  const weekdayAvg = weekdaySteps.length ?
-    Math.round(weekdaySteps.reduce((a,v)=>a+v,0) / weekdaySteps.length) : 0;
+  const weekAvg = thisWeekSteps.length ?
+    Math.round(thisWeekSteps.reduce((a,v)=>a+v,0) / thisWeekSteps.length) : 0;
 
   const w = yWeight || todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
   const reportPrompt = `__DAILY_REPORT__ 昨日(${yStr})の記録:
 体重: ${yWeight || '記録なし'}kg ／ 歩数: ${ySteps?.toLocaleString() || '?'}歩
-平日平均歩数（直近7日）: ${weekdayAvg.toLocaleString()}歩 / 目標${S.goalSteps.toLocaleString()}歩
+今週平均歩数（月〜日）: ${weekAvg.toLocaleString()}歩 / 目標${S.goalSteps.toLocaleString()}歩
 カロリー: ${totCal.toFixed(1)}/${S.goalCalMin}〜${S.goalCalMax}kcal
 PFC: P${totP.toFixed(1)}/${pGoal}g+ F${totF.toFixed(1)}/${S.goalF}g C${totC.toFixed(1)}g
 食事:
@@ -1320,7 +1343,7 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 
 【重要】
 - **体脂肪率には触れないでください**（48kg達成までは体重最優先）
-- 歩数は1日単位ではなく**平日平均で評価**してください（休日は少なくてOK）
+- 歩数は1日単位ではなく**週平均（月〜日）で評価**してください（休日は少なくてOK）
 - マークダウン記法は使わない。プレーンテキストで改行と絵文字で整える
 
 ユーザーから __DAILY_REPORT__ で始まるメッセージが来た場合、昨日の振り返りと今日のアドバイスを以下の構成で短くまとめてください：
@@ -1473,11 +1496,11 @@ async function sendChat(){
 - タンパク質 ${ctx.tP.toFixed(1)}/${ctx.pGoal}g以上（最優先）
 - 脂質 ${ctx.tF.toFixed(1)}/${S.goalF}g
 - 炭水化物 ${ctx.tC.toFixed(1)}g
-- 歩数 ${ctx.steps}歩（目標${S.goalSteps}歩・平日平均で見る）
+- 歩数 ${ctx.steps}歩（目標${S.goalSteps}歩・週平均で見る）
 - 今日の食事:\n${ctx.mealsText}
 
 PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
-歩数は1日単位ではなく週間平均で評価する（休日は少なくてOK）。
+歩数は1日単位ではなく週平均（月〜日）で評価する（休日は少なくてOK）。
 **現在の主目標は48kgの体重達成です。体脂肪率については48kg達成まで言及しないでください**（聞かれた時だけ答える）。
 
 【出力形式】
@@ -1739,7 +1762,7 @@ async function loadGraphData(days){
   // 30/90/365日分を取得
   const start = new Date();
   start.setDate(start.getDate() - days + 1);
-  const startStr = start.toISOString().slice(0,10);
+  const startStr = localDateStr(start);
 
   setSync('');
   try {
@@ -1756,12 +1779,15 @@ async function loadGraphData(days){
         method:'POST',
         body: JSON.stringify(body)
       });
-      allData = allData.concat(d.results.map(r=>({
-        date: r.properties['日付']?.date?.start,
-        weight: r.properties['体重']?.number,
-        fat: r.properties['体脂肪率']?.number,
-        steps: r.properties['歩数']?.number
-      })));
+      allData = allData.concat(d.results.map(r=>{
+        const fatVal = r.properties['体脂肪率']?.number;
+        return {
+          date: r.properties['日付']?.date?.start,
+          weight: r.properties['体重']?.number,
+          fat: (fatVal && fatVal > 0) ? fatVal : null,
+          steps: r.properties['歩数']?.number
+        };
+      }));
       hasMore = d.has_more;
       cursor = d.next_cursor;
       if(allData.length > 500) break;
@@ -1794,7 +1820,7 @@ function aggregateData(data, days){
       const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       const monday = new Date(dt);
       monday.setDate(dt.getDate() + offsetToMonday);
-      const key = monday.toISOString().slice(0,10);
+      const key = localDateStr(monday);
       if(!byWeek[key]) byWeek[key] = {w:[], f:[], s:[]};
       if(d.weight) byWeek[key].w.push(d.weight);
       if(d.fat) byWeek[key].f.push(d.fat);
@@ -1869,7 +1895,7 @@ function renderGraphs(){
         const y = 80 - (d.fat-fMin)/fRange*70;
         return `${x},${y}`;
       }).filter(p=>p);
-      html += `<polyline points="${fpts.join(' ')}" fill="none" stroke="#C9B8FF" stroke-width="1.5" stroke-dasharray="3,2" stroke-linejoin="round" opacity="0.6"/>`;
+      html += `<polyline points="${fpts.join(' ')}" fill="none" stroke="#C9B8FF" stroke-width="1.5" stroke-dasharray="3,2" stroke-linejoin="round" opacity="0.7"/>`;
     }
     // 体重の折れ線
     if(ws.length > 1){
@@ -1881,18 +1907,34 @@ function renderGraphs(){
       }).filter(p=>p);
       html += `<polyline points="${wpts.join(' ')}" fill="none" stroke="#FFB5C8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
     }
-    // 体重の点とラベル（密な期間ではラベル省略）
     const showLabels = n <= 14;
+    // 体脂肪率の点とラベル（7日のとき表示）
+    if(currentPeriod === 7 && fs.length){
+      aggregated.forEach((d,i)=>{
+        if(d.fat == null) return;
+        const x = i*xStep + 10;
+        const y = 80 - (d.fat-fMin)/fRange*70;
+        html += `<circle cx="${x}" cy="${y}" r="2.5" fill="#A08AFF" opacity="0.7"/>`;
+        html += `<text x="${x}" y="${y+12}" text-anchor="middle" font-size="8" fill="#A08AFF" opacity="0.8">${d.fat.toFixed(1)}</text>`;
+      });
+    }
+    // 体重の点とラベル
     aggregated.forEach((d,i)=>{
       if(d.weight == null) return;
       const x = i*xStep + 10;
       const y = 80 - (d.weight-wMin)/wRange*70;
-      html += `<circle cx="${x}" cy="${y}" r="${n>30?2:3.5}" fill="#FF8FAD"/>`;
+      const dataIdx = i;
+      html += `<circle cx="${x}" cy="${y}" r="${n>30?2:3.5}" fill="#FF8FAD" data-graph-pt="${dataIdx}" style="cursor:pointer"/>`;
       if(showLabels){
         html += `<text x="${x}" y="${y-8}" text-anchor="middle" font-size="9" fill="#9B8FAE">${d.weight.toFixed(1)}</text>`;
       }
     });
     svg.innerHTML = html;
+
+    // 30日以降のtap/hover対応
+    if(n > 14){
+      attachGraphInteraction(svg, aggregated, currentPeriod, wMin, wRange, xStep);
+    }
   } else {
     document.getElementById('weightSvg').innerHTML = '';
     document.getElementById('weightAvg').textContent = 'データなし';
@@ -1903,6 +1945,85 @@ function renderGraphs(){
     aggregated.map(d=>d.steps||0),
     aggregated.map(d=>d.label),
     S.goalSteps, '歩', '#B8F0E0', currentPeriod);
+}
+
+function attachGraphInteraction(svg, aggregated, period, wMin, wRange, xStep){
+  const tooltip = document.getElementById('graphTooltip');
+  if(!tooltip) return;
+  const points = svg.querySelectorAll('[data-graph-pt]');
+
+  const showAt = (idx, clientX, clientY)=>{
+    const d = aggregated[idx];
+    if(!d || d.weight == null) return;
+    const lbl = formatGraphLabel(d.label, period);
+    let html = `<div style="font-weight:700;margin-bottom:2px">${lbl}</div>`;
+    html += `体重 ${d.weight.toFixed(1)}kg`;
+    if(d.fat != null) html += `<br>体脂肪率 ${d.fat.toFixed(1)}%`;
+    if(d.steps != null) html += `<br>歩数 ${d.steps.toLocaleString()}歩`;
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    // SVGの相対位置に基づいて配置
+    const svgRect = svg.getBoundingClientRect();
+    const ttRect = tooltip.getBoundingClientRect();
+    const wrap = svg.parentElement;
+    const wrapRect = wrap.getBoundingClientRect();
+    let left = clientX - wrapRect.left - ttRect.width/2;
+    let top = clientY - wrapRect.top - ttRect.height - 12;
+    if(left < 4) left = 4;
+    if(left + ttRect.width > wrapRect.width - 4) left = wrapRect.width - ttRect.width - 4;
+    if(top < 4) top = clientY - wrapRect.top + 12;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  };
+  const hide = ()=>{ tooltip.style.display = 'none'; };
+
+  points.forEach(pt=>{
+    pt.addEventListener('mouseenter', (e)=>{
+      const idx = parseInt(pt.getAttribute('data-graph-pt'));
+      showAt(idx, e.clientX, e.clientY);
+    });
+    pt.addEventListener('mouseleave', hide);
+    pt.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      const idx = parseInt(pt.getAttribute('data-graph-pt'));
+      const t = e.touches[0];
+      showAt(idx, t.clientX, t.clientY);
+      // 3秒後に消す
+      clearTimeout(window._tooltipTimer);
+      window._tooltipTimer = setTimeout(hide, 3000);
+    });
+  });
+
+  // 何もない場所をタップでツールチップを消す
+  svg.addEventListener('click', (e)=>{
+    if(e.target.tagName !== 'circle') hide();
+  });
+}
+
+function formatGraphLabel(label, period){
+  if(!label) return '';
+  if(period === 7 || period === 30){
+    // YYYY-MM-DD → MM/DD (曜日)
+    const dt = new Date(label);
+    const m = dt.getMonth()+1;
+    const d = dt.getDate();
+    const w = ['日','月','火','水','木','金','土'][dt.getDay()];
+    return `${m}/${d}(${w})`;
+  }
+  if(period === 90){
+    // 月の何週目かを表示
+    const dt = new Date(label);
+    const m = dt.getMonth()+1;
+    const day = dt.getDate();
+    const weekNum = Math.ceil(day / 7);
+    return `${m}月第${weekNum}週`;
+  }
+  if(period === 365){
+    // YYYY-MM → ◯月
+    const m = parseInt(label.slice(5,7));
+    return `${m}月`;
+  }
+  return label;
 }
 
 function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
