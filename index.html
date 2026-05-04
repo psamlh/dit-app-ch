@@ -52,6 +52,12 @@ button,input,select{font-family:inherit;color:inherit}
 .cal-remain{font-size:12px;color:#9B8FAE;margin-top:2px;margin-bottom:10px}
 .prog-bar{height:8px;background:#F5F0FF;border-radius:4px;overflow:hidden;margin-bottom:4px}
 .prog-fill{height:100%;border-radius:4px;transition:width .4s}
+.cal-bar-wrap{position:relative;height:10px;background:#F5F0FF;border-radius:5px;overflow:hidden;margin-bottom:4px}
+.cal-bar-fill{position:absolute;top:0;height:100%;transition:width .4s}
+.cal-bar-normal{left:0;background:linear-gradient(90deg,#FFB5C8,#FF8FAD);border-radius:5px 0 0 5px}
+.cal-bar-over{background:linear-gradient(90deg,#FFD96B,#FFA94D);border-radius:0 5px 5px 0}
+.cal-bar-marker{position:absolute;top:-2px;bottom:-2px;width:1.5px;background:#A08AFF;opacity:0.5}
+.cal-bar-marker-max{background:#7A5BC9;opacity:0.7}
 .pfc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
 .pfc-item{background:#FDF5FF;border-radius:12px;padding:8px;text-align:center}
 .pfc-name{font-size:9px;color:#9B8FAE;margin-bottom:2px}
@@ -130,9 +136,11 @@ button,input,select{font-family:inherit;color:inherit}
 .attached-preview{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#FFE4ED;border-radius:10px;margin-bottom:8px;font-size:11px;color:#FF8FAD}
 .attached-preview img{width:30px;height:30px;border-radius:6px;object-fit:cover}
 .attached-preview .clear-btn{margin-left:auto;background:none;border:none;color:#FF8FAD;cursor:pointer;font-size:16px;padding:0}
-.weight-svg{width:100%;max-width:600px;display:block;margin:0 auto;aspect-ratio:300/80}
-.mini-graph{height:80px;display:flex;align-items:flex-end;gap:3px;position:relative;margin-top:4px;padding-bottom:14px;max-width:600px;margin-left:auto;margin-right:auto}
-.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.weight-svg{width:100%;max-width:600px;display:block;margin:0 auto;aspect-ratio:340/80}
+.mini-graph{display:flex;height:90px;position:relative;margin-top:4px;padding-bottom:14px;max-width:600px;margin-left:auto;margin-right:auto;gap:4px}
+.bar-yaxis{display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:#9B8FAE;width:30px;flex-shrink:0;text-align:right;padding-right:2px;padding-bottom:14px}
+.bar-area{flex:1;display:flex;align-items:flex-end;gap:3px;border-left:1px solid #f5edff;padding-left:4px}
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end}
 .bar{width:100%;border-radius:4px 4px 0 0;min-height:4px}
 .bar-lbl,.bar-val{font-size:8px;color:#9B8FAE}
 .graph-avg{font-size:11px;color:#9B8FAE;background:#F5F0FF;padding:2px 8px;border-radius:8px;margin-left:6px}
@@ -199,7 +207,12 @@ button,input,select{font-family:inherit;color:inherit}
     <div class="card"><div class="sec-title">カロリー</div>
       <div class="cal-big"><span id="calVal">0</span><span style="font-size:16px;color:#9B8FAE"> kcal</span></div>
       <div class="cal-remain">目標 <span id="calTargetRange">1300〜1400</span> kcal ／ 残り <span id="calLeft" style="color:#FF8FAD;font-weight:700">--</span> kcal</div>
-      <div class="prog-bar"><div class="prog-fill" id="calBar" style="width:0%;background:linear-gradient(90deg,#FFB5C8,#FF8FAD)"></div></div>
+      <div class="cal-bar-wrap" id="calBarWrap">
+        <div class="cal-bar-fill cal-bar-normal" id="calBarNormal" style="width:0%"></div>
+        <div class="cal-bar-fill cal-bar-over" id="calBarOver" style="width:0%"></div>
+        <div class="cal-bar-marker" id="calBarMin" title="下限"></div>
+        <div class="cal-bar-marker cal-bar-marker-max" id="calBarMax" title="上限"></div>
+      </div>
       <div class="pfc-grid">
         <div class="pfc-item"><div class="pfc-name">タンパク質</div><div class="pfc-val" style="color:#A08AFF" id="pVal">0g</div><div class="pfc-remain">目標 <span id="pTarget">79</span>g+</div></div>
         <div class="pfc-item"><div class="pfc-name">脂質</div><div class="pfc-val" style="color:#FF8FAD" id="fVal">0g</div><div class="pfc-remain">目標 <span id="fTarget">45</span>g</div></div>
@@ -277,7 +290,7 @@ button,input,select{font-family:inherit;color:inherit}
         <span class="graph-avg" id="weightAvg">--</span>
       </div>
       <div style="position:relative">
-        <svg class="weight-svg" id="weightSvg" viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg class="weight-svg" id="weightSvg" viewBox="0 0 340 80" preserveAspectRatio="xMidYMid meet"></svg>
         <div id="graphTooltip" style="display:none;position:absolute;background:#4A3F5C;color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;pointer-events:none;z-index:10;line-height:1.5;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15)"></div>
       </div>
       <div style="display:flex;gap:14px;font-size:10px;margin-top:6px;justify-content:center">
@@ -859,7 +872,29 @@ function refreshHome(){
     calLeftEl.textContent = calLeftMax.toFixed(1);
     calLeftEl.style.color = '#FF8FAD';
   }
-  document.getElementById('calBar').style.width = Math.min(100, tCal/S.goalCalMax*100)+'%';
+  // カロリーバー：スケールはmax * 1.3まで（少し余裕を持たせる）
+  const barScale = S.goalCalMax * 1.3;
+  // 通常部分：0〜下限(min)、超過部分：下限以降
+  const normalEnd = Math.min(tCal, S.goalCalMin);
+  const overAmount = Math.max(0, tCal - S.goalCalMin);
+  const normalPct = (normalEnd / barScale) * 100;
+  const overPct = (overAmount / barScale) * 100;
+  document.getElementById('calBarNormal').style.width = Math.min(100, normalPct) + '%';
+  document.getElementById('calBarOver').style.left = normalPct + '%';
+  document.getElementById('calBarOver').style.width = Math.min(100 - normalPct, overPct) + '%';
+  // 下限・上限マーカーの位置
+  document.getElementById('calBarMin').style.left = (S.goalCalMin / barScale * 100) + '%';
+  document.getElementById('calBarMax').style.left = (S.goalCalMax / barScale * 100) + '%';
+  // 超過部分の色を「下限〜上限」と「上限超え」で変える
+  const overEl = document.getElementById('calBarOver');
+  if(tCal > S.goalCalMax){
+    // 上限も超え：下限〜上限は黄色、上限超えは赤
+    // シンプルに：下限超えはグラデーションで黄→赤
+    overEl.style.background = 'linear-gradient(90deg, #FFD96B, #E24B4A)';
+  } else {
+    // 下限超えだが上限内：黄〜オレンジ
+    overEl.style.background = 'linear-gradient(90deg, #FFD96B, #FFA94D)';
+  }
   document.getElementById('pVal').textContent = tP.toFixed(1)+'g';
   document.getElementById('fVal').textContent = tF.toFixed(1)+'g';
   document.getElementById('cVal').textContent = tC.toFixed(1)+'g';
@@ -1884,14 +1919,40 @@ function renderGraphs(){
 
     const svg = document.getElementById('weightSvg');
     const n = aggregated.length;
-    const xStep = n > 1 ? 280/(n-1) : 0;
+    // プロット領域: x=22〜298（左右に縦軸ラベル用余白）
+    const xStart = 22, xEnd = 298;
+    const xRange = xEnd - xStart;
+    const xStep = n > 1 ? xRange/(n-1) : 0;
 
     let html = '';
+    // === 縦軸グリッド & ラベル（左:体重 / 右:体脂肪率）===
+    // 体重メモリ（4段階）
+    const wTicks = [];
+    for(let i = 0; i <= 3; i++){
+      wTicks.push(wMin + (wRange * i / 3));
+    }
+    wTicks.forEach((val, idx)=>{
+      const y = 80 - (val - wMin)/wRange*70;
+      html += `<line x1="${xStart}" y1="${y}" x2="${xEnd}" y2="${y}" stroke="#f5edff" stroke-width="0.5"/>`;
+      html += `<text x="${xStart-2}" y="${y+3}" text-anchor="end" font-size="7" fill="#FF8FAD">${val.toFixed(1)}</text>`;
+    });
+    // 体脂肪率メモリ（右側、データある時のみ）
+    if(fs.length){
+      const fTicks = [];
+      for(let i = 0; i <= 3; i++){
+        fTicks.push(fMin + (fRange * i / 3));
+      }
+      fTicks.forEach(val=>{
+        const y = 80 - (val - fMin)/fRange*70;
+        html += `<text x="${xEnd+2}" y="${y+3}" text-anchor="start" font-size="7" fill="#A08AFF">${val.toFixed(1)}</text>`;
+      });
+    }
+
     // 体脂肪率の折れ線（薄め）
     if(fs.length > 1){
       const fpts = aggregated.map((d,i)=>{
         if(d.fat == null) return null;
-        const x = i*xStep + 10;
+        const x = i*xStep + xStart;
         const y = 80 - (d.fat-fMin)/fRange*70;
         return `${x},${y}`;
       }).filter(p=>p);
@@ -1901,7 +1962,7 @@ function renderGraphs(){
     if(ws.length > 1){
       const wpts = aggregated.map((d,i)=>{
         if(d.weight == null) return null;
-        const x = i*xStep + 10;
+        const x = i*xStep + xStart;
         const y = 80 - (d.weight-wMin)/wRange*70;
         return `${x},${y}`;
       }).filter(p=>p);
@@ -1912,29 +1973,29 @@ function renderGraphs(){
     if(currentPeriod === 7 && fs.length){
       aggregated.forEach((d,i)=>{
         if(d.fat == null) return;
-        const x = i*xStep + 10;
+        const x = i*xStep + xStart;
         const y = 80 - (d.fat-fMin)/fRange*70;
         html += `<circle cx="${x}" cy="${y}" r="2.5" fill="#A08AFF" opacity="0.7"/>`;
         html += `<text x="${x}" y="${y+12}" text-anchor="middle" font-size="8" fill="#A08AFF" opacity="0.8">${d.fat.toFixed(1)}</text>`;
       });
     }
-    // 体重の点とラベル
+    // 体重の点とラベル + 透明ヒット領域（タップしやすく）
     aggregated.forEach((d,i)=>{
       if(d.weight == null) return;
-      const x = i*xStep + 10;
+      const x = i*xStep + xStart;
       const y = 80 - (d.weight-wMin)/wRange*70;
-      const dataIdx = i;
-      html += `<circle cx="${x}" cy="${y}" r="${n>30?2:3.5}" fill="#FF8FAD" data-graph-pt="${dataIdx}" style="cursor:pointer"/>`;
+      // 見た目の点
+      html += `<circle cx="${x}" cy="${y}" r="${n>30?2:3.5}" fill="#FF8FAD"/>`;
       if(showLabels){
         html += `<text x="${x}" y="${y-8}" text-anchor="middle" font-size="9" fill="#9B8FAE">${d.weight.toFixed(1)}</text>`;
       }
+      // 透明な大きいヒット領域（タップ・ホバー検出用）
+      html += `<circle cx="${x}" cy="${y}" r="10" fill="transparent" data-graph-pt="${i}" style="cursor:pointer"/>`;
     });
     svg.innerHTML = html;
 
-    // 30日以降のtap/hover対応
-    if(n > 14){
-      attachGraphInteraction(svg, aggregated, currentPeriod, wMin, wRange, xStep);
-    }
+    // 全期間でtap/hover対応
+    attachGraphInteraction(svg, aggregated, currentPeriod);
   } else {
     document.getElementById('weightSvg').innerHTML = '';
     document.getElementById('weightAvg').textContent = 'データなし';
@@ -1947,7 +2008,7 @@ function renderGraphs(){
     S.goalSteps, '歩', '#B8F0E0', currentPeriod);
 }
 
-function attachGraphInteraction(svg, aggregated, period, wMin, wRange, xStep){
+function attachGraphInteraction(svg, aggregated, period){
   const tooltip = document.getElementById('graphTooltip');
   if(!tooltip) return;
   const points = svg.querySelectorAll('[data-graph-pt]');
@@ -1959,11 +2020,9 @@ function attachGraphInteraction(svg, aggregated, period, wMin, wRange, xStep){
     let html = `<div style="font-weight:700;margin-bottom:2px">${lbl}</div>`;
     html += `体重 ${d.weight.toFixed(1)}kg`;
     if(d.fat != null) html += `<br>体脂肪率 ${d.fat.toFixed(1)}%`;
-    if(d.steps != null) html += `<br>歩数 ${d.steps.toLocaleString()}歩`;
     tooltip.innerHTML = html;
     tooltip.style.display = 'block';
     // SVGの相対位置に基づいて配置
-    const svgRect = svg.getBoundingClientRect();
     const ttRect = tooltip.getBoundingClientRect();
     const wrap = svg.parentElement;
     const wrapRect = wrap.getBoundingClientRect();
@@ -1996,7 +2055,7 @@ function attachGraphInteraction(svg, aggregated, period, wMin, wRange, xStep){
 
   // 何もない場所をタップでツールチップを消す
   svg.addEventListener('click', (e)=>{
-    if(e.target.tagName !== 'circle') hide();
+    if(!e.target.hasAttribute('data-graph-pt')) hide();
   });
 }
 
@@ -2035,8 +2094,18 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
   document.getElementById(avgId).textContent = '平均 '+(av||'--').toLocaleString()+unit;
   const days = ['日','月','火','水','木','金','土'];
   const showLabel = vals.length <= 14;
-  el.innerHTML = vals.map((v,i)=>{
-    const h = Math.max(4, v/mx*60);
+
+  // 縦軸メモリ（4段階）
+  const ticks = [];
+  for(let i = 3; i >= 0; i--){
+    ticks.push(Math.round(mx * i / 3));
+  }
+  let yAxisHtml = '<div class="bar-yaxis">' +
+    ticks.map(t => `<span>${t.toLocaleString()}</span>`).join('') +
+    '</div>';
+
+  let barsHtml = '<div class="bar-area">' + vals.map((v,i)=>{
+    const h = Math.max(4, v/mx*100);
     let lbl = '';
     if(showLabel && labels[i]){
       const dt = new Date(labels[i]);
@@ -2045,10 +2114,12 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
     }
     return `<div class="bar-wrap">
       <span class="bar-val">${v>0 && vals.length<=14 ? Math.round(v).toLocaleString() : ''}</span>
-      <div class="bar" style="height:${h}px;background:${col}"></div>
+      <div class="bar" style="height:${h}%;background:${col}"></div>
       <span class="bar-lbl">${lbl}</span>
     </div>`;
-  }).join('');
+  }).join('') + '</div>';
+
+  el.innerHTML = yAxisHtml + barsHtml;
 }
 
 function switchTab(tab, btn){
