@@ -19,7 +19,7 @@ button,input,select{font-family:inherit;color:inherit}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#9B8FAE;margin-left:auto}
 .sync-dot.ok{background:#5DCAA5}
 .sync-dot.err{background:#E24B4A}
-.week-cal{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.week-cal{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin-bottom:10px;background:#fff;padding:8px;border-radius:14px;border:1px solid #f0e8f5}
 .week-cal::-webkit-scrollbar{display:none}
 .day-btn{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;padding:5px 2px;border-radius:10px;cursor:pointer;border:none;background:none;flex-shrink:0}
 .day-btn.active{background:linear-gradient(135deg,#FFB5C8,#C9B8FF)}
@@ -126,7 +126,8 @@ button,input,select{font-family:inherit;color:inherit}
 .attached-preview{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#FFE4ED;border-radius:10px;margin-bottom:8px;font-size:11px;color:#FF8FAD}
 .attached-preview img{width:30px;height:30px;border-radius:6px;object-fit:cover}
 .attached-preview .clear-btn{margin-left:auto;background:none;border:none;color:#FF8FAD;cursor:pointer;font-size:16px;padding:0}
-.mini-graph{height:80px;display:flex;align-items:flex-end;gap:3px;position:relative;margin-top:4px;padding-bottom:14px}
+.weight-svg{width:100%;max-width:600px;display:block;margin:0 auto;aspect-ratio:300/80}
+.mini-graph{height:80px;display:flex;align-items:flex-end;gap:3px;position:relative;margin-top:4px;padding-bottom:14px;max-width:600px;margin-left:auto;margin-right:auto}
 .bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
 .bar{width:100%;border-radius:4px 4px 0 0;min-height:4px}
 .bar-lbl,.bar-val{font-size:8px;color:#9B8FAE}
@@ -156,7 +157,16 @@ button,input,select{font-family:inherit;color:inherit}
 .nav-lbl{font-size:9px;color:#9B8FAE}
 .nav-btn.active .nav-lbl{color:#FF8FAD;font-weight:700}
 .empty-text{text-align:center;color:#9B8FAE;font-size:13px;padding:16px 0}
-.weight-svg{width:100%;height:80px}
+.reward-item{padding:10px 0;border-bottom:1px solid #f9f4ff}
+.reward-item:last-child{border-bottom:none}
+.reward-name{font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.reward-status{display:inline-block;font-size:9px;padding:2px 8px;border-radius:8px;font-weight:500}
+.reward-status.planning{background:#FFE4ED;color:#C03A66}
+.reward-status.done{background:#EAF7EF;color:#2D8A56}
+.reward-status.repeat{background:#EDE8FF;color:#6B5BC9}
+.reward-memo{font-size:11px;color:#9B8FAE;margin-top:3px;line-height:1.5}
+.reward-url{display:inline-block;font-size:11px;color:#A08AFF;margin-top:4px;text-decoration:none}
+.reward-url:hover{text-decoration:underline}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#4A3F5C;color:#fff;padding:8px 16px;border-radius:20px;font-size:12px;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 .thinking{padding:6px 12px;color:#9B8FAE;font-size:12px;font-style:italic}
@@ -165,11 +175,14 @@ button,input,select{font-family:inherit;color:inherit}
 <body>
 <div class="header">
   <div class="app-title">ダイエットコーチ 🐰<span class="sync-dot" id="syncDot"></span></div>
-  <div class="week-cal" id="weekCal"></div>
 </div>
 
 <div class="content">
   <div class="page active" id="homePage">
+    <div class="card" id="goalCard" style="display:none">
+      <div class="sec-title">🎯 ダイエット目標</div>
+      <div id="goalText" style="font-size:13px;line-height:1.6;white-space:pre-wrap;color:#4A3F5C"></div>
+    </div>
     <div class="card"><div class="sec-title">体重</div>
       <div class="weight-row"><div class="weight-big" id="weightVal">--</div><div class="weight-unit">kg</div><div class="weight-badge same" id="weightDiff">--</div></div>
       <div style="font-size:12px;color:#9B8FAE">体脂肪率: <span id="fatVal">--%</span> ／ BMI: <span id="bmiVal">--</span></div>
@@ -191,9 +204,22 @@ button,input,select{font-family:inherit;color:inherit}
       </div>
       <div class="prog-bar" style="margin-top:8px"><div class="prog-fill" id="stepsBar" style="width:0%;background:linear-gradient(90deg,#B8F0E0,#5DCAA5)"></div></div>
     </div>
+    <div class="card">
+      <div class="sec-title">📊 今週の平均カロリー（月〜日）</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <div style="font-size:24px;font-weight:700" id="weeklyAvgCal">--</div>
+        <div style="font-size:13px;color:#9B8FAE">kcal/日</div>
+      </div>
+      <div style="font-size:11px;color:#9B8FAE;margin-top:4px" id="weeklyDays">--日分のデータ</div>
+    </div>
+    <div class="card" id="rewardCard" style="display:none">
+      <div class="sec-title">🎁 ご褒美リスト</div>
+      <div id="rewardList"></div>
+    </div>
   </div>
 
   <div class="page" id="mealPage">
+    <div class="week-cal" id="weekCal"></div>
     <button class="coach-link" onclick="switchTab('coach',null);highlightCoach()">💬 コーチで食事を記録 →</button>
     <div id="mealAllSections"></div>
     <button class="add-btn" onclick="openFavPick()">⭐ お気に入りからクイック記録</button>
@@ -229,7 +255,7 @@ button,input,select{font-family:inherit;color:inherit}
         <div class="sec-title" style="margin:0">体重推移（7日）</div>
         <span class="graph-avg" id="weightAvg">--</span>
       </div>
-      <svg class="weight-svg" id="weightSvg" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
+      <svg class="weight-svg" id="weightSvg" viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;margin-bottom:4px">
@@ -255,6 +281,8 @@ button,input,select{font-family:inherit;color:inherit}
       <input class="pw-input" id="mealDbIdInput" value="81b87366-c4c4-4bf1-b714-fbd91e3b0867">
       <label class="form-label">お気に入り食事 DB ID</label>
       <input class="pw-input" id="favDbIdInput" value="70b5ecae-970c-4ff8-93ad-556740b345c9">
+      <label class="form-label">ごほうびリスト DB ID</label>
+      <input class="pw-input" id="rewardDbIdInput" value="763d21db-4317-4082-9c7b-c5afb1f41215">
     </div>
     <div class="card"><div class="sec-title">目標値（Notionプロフィールから取得）</div>
       <div class="setting-row"><span class="setting-label">カロリー</span><span style="color:#9B8FAE;font-size:13px"><span id="goalCalDisp">1350</span> kcal</span></div>
@@ -307,9 +335,11 @@ const S = {
   dbId:'1789e196-4913-4cb7-af68-81acdd3f6cfd',
   mealDbId:'81b87366-c4c4-4bf1-b714-fbd91e3b0867',
   favDbId:'70b5ecae-970c-4ff8-93ad-556740b345c9',
+  rewardDbId:'763d21db-4317-4082-9c7b-c5afb1f41215',
   goalCal:1350, goalPRatio:1.6, goalF:45, goalSteps:7000, height:159
 };
 let meals=[], favorites=[], weekData=[], chatHistory=[];
+let rewards=[], dietGoals='';
 let todayData = {weight:null, fat:null, bmi:null, steps:null};
 let yesterdayWeight = null;
 let coachInited = false;
@@ -318,6 +348,8 @@ let editingFav = null;
 let attachedImage = null;
 let recCounter = 0;
 let imageDB = null;
+let selectedDate = '';  // 選択中の日付（食事タブ用）
+let weekCalories = [];  // 週ごとのカロリー
 
 function initImageDB(){
   return new Promise(resolve=>{
@@ -377,6 +409,7 @@ function applySettingsToUI(){
   document.getElementById('dbIdInput').value = S.dbId;
   document.getElementById('mealDbIdInput').value = S.mealDbId;
   document.getElementById('favDbIdInput').value = S.favDbId;
+  document.getElementById('rewardDbIdInput').value = S.rewardDbId;
   refreshGoals();
 }
 function saveSettings(){
@@ -385,6 +418,7 @@ function saveSettings(){
   S.dbId = document.getElementById('dbIdInput').value.trim();
   S.mealDbId = document.getElementById('mealDbIdInput').value.trim();
   S.favDbId = document.getElementById('favDbIdInput').value.trim();
+  S.rewardDbId = document.getElementById('rewardDbIdInput').value.trim();
   try { localStorage.setItem('dietApp_v6', JSON.stringify(S)); } catch(e){}
   const m = document.getElementById('settingMsg');
   m.className = 'msg-ok'; m.textContent = '✓ 保存。同期中...';
@@ -411,17 +445,31 @@ function refreshGoals(){
 
 function buildWeekCal(){
   const el = document.getElementById('weekCal');
+  if(!el) return;
   el.innerHTML = '';
-  const days = ['日','月','火','水','木','金','土'];
+  const days = ['月','火','水','木','金','土','日'];
   const today = new Date();
-  for(let i=6; i>=0; i--){
-    const d = new Date(today); d.setDate(today.getDate()-i);
+  // 今週の月曜日を取得
+  const dayOfWeek = today.getDay(); // 0=日, 1=月,...6=土
+  const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + offsetToMonday);
+
+  for(let i = 0; i < 7; i++){
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    const dStr = d.toISOString().slice(0,10);
+    const isToday = dStr === todayStr();
+    const isFuture = d > today;
     const b = document.createElement('button');
-    b.className = 'day-btn' + (i===0 ? ' active':'');
-    b.innerHTML = `<span class="day-lbl">${days[d.getDay()]}</span><span class="day-num">${d.getDate()}</span><span class="day-dot"></span>`;
+    b.className = 'day-btn' + (dStr === selectedDate ? ' active' : '');
+    b.disabled = isFuture;
+    if(isFuture) b.style.opacity = '0.3';
+    b.innerHTML = `<span class="day-lbl">${days[i]}</span><span class="day-num">${d.getDate()}</span><span class="day-dot"${isToday?' style="background:#FF8FAD"':''}></span>`;
     b.onclick = function(){
-      document.querySelectorAll('.day-btn').forEach(x=>x.classList.remove('active'));
-      this.classList.add('active');
+      if(isFuture) return;
+      selectedDate = dStr;
+      buildWeekCal();
+      fetchMealsForDate(dStr).then(()=> refreshMeals());
     };
     el.appendChild(b);
   }
@@ -487,11 +535,12 @@ async function fetchWeekData(){
     steps:r.properties['歩数']?.number
   }));
 }
-async function fetchTodayMeals(){
+async function fetchMealsForDate(dateStr){
+  const target = dateStr || todayStr();
   const d = await notionFetch(`https://api.notion.com/v1/databases/${S.mealDbId}/query`,{
     method:'POST',
     body: JSON.stringify({
-      filter:{property:'日付', date:{equals: todayStr()}},
+      filter:{property:'日付', date:{equals: target}},
       sorts:[{timestamp:'created_time', direction:'ascending'}]
     })
   });
@@ -505,6 +554,9 @@ async function fetchTodayMeals(){
     c: r.properties['C']?.number || 0,
     amount: (r.properties['量(%)']?.number || 1.0) * 100
   }));
+}
+async function fetchTodayMeals(){
+  return fetchMealsForDate(todayStr());
 }
 async function fetchFavorites(){
   const d = await notionFetch(`https://api.notion.com/v1/databases/${S.favDbId}/query`,{
@@ -567,11 +619,33 @@ async function fetchGoalsFromProfile(){
   try {
     const d = await notionFetch(`https://api.notion.com/v1/blocks/${profilePageId}/children?page_size=100`);
     let inGoal = false;
+    let inDietGoal = false;
+    let goalParas = [];
     for(const block of d.results){
+      // 目標値テーブル
       if(block.type === 'heading_1' && block.heading_1?.rich_text?.[0]?.plain_text?.includes('アプリ用目標値')){
-        inGoal = true; continue;
+        inGoal = true; inDietGoal = false; continue;
       }
-      if(inGoal && block.type === 'heading_1') break;
+      // ダイエット目標セクション
+      if(block.type === 'heading_1' && block.heading_1?.rich_text?.[0]?.plain_text?.includes('ダイエット目標')){
+        inDietGoal = true; inGoal = false; continue;
+      }
+      if((inGoal || inDietGoal) && block.type === 'heading_1'){
+        inGoal = false; inDietGoal = false;
+        continue;
+      }
+      // ダイエット目標のテキスト集計
+      if(inDietGoal){
+        if(block.type === 'paragraph'){
+          const text = block.paragraph?.rich_text?.map(t=>t.plain_text).join('') || '';
+          if(text.trim()) goalParas.push(text);
+        } else if(block.type === 'quote'){
+          const text = block.quote?.rich_text?.map(t=>t.plain_text).join('') || '';
+          if(text.trim()) goalParas.push('💡 ' + text);
+        }
+        continue;
+      }
+      // 目標値テーブル
       if(inGoal && block.type === 'table'){
         const rows = await notionFetch(`https://api.notion.com/v1/blocks/${block.id}/children?page_size=100`);
         for(const row of rows.results){
@@ -587,10 +661,63 @@ async function fetchGoalsFromProfile(){
           else if(key === 'target_steps') S.goalSteps = val;
           else if(key === 'height') S.height = val;
         }
-        break;
+        inGoal = false;
       }
     }
+    dietGoals = goalParas.join('\n').trim();
   } catch(e){ console.warn('goal fetch:', e); }
+}
+
+// ごほうびリスト取得
+async function fetchRewards(){
+  if(!S.rewardDbId) return;
+  try {
+    const d = await notionFetch(`https://api.notion.com/v1/databases/${S.rewardDbId}/query`,{
+      method:'POST',
+      body: JSON.stringify({
+        filter:{property:'表示', checkbox:{equals: true}},
+        page_size: 50
+      })
+    });
+    rewards = d.results.map(r=>({
+      id: r.id,
+      name: r.properties['名前']?.title?.[0]?.plain_text || '',
+      status: r.properties['ステータス']?.select?.name || '',
+      url: r.properties['URL']?.url || '',
+      memo: r.properties['メモ']?.rich_text?.[0]?.plain_text || ''
+    }));
+  } catch(e){ console.warn('reward fetch:', e); rewards = []; }
+}
+
+// 今週（月〜日）の摂取カロリー集計
+async function fetchWeeklyCalories(){
+  // 今週の月曜日を計算
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + offsetToMonday);
+  const mondayStr = monday.toISOString().slice(0,10);
+
+  try {
+    const d = await notionFetch(`https://api.notion.com/v1/databases/${S.mealDbId}/query`,{
+      method:'POST',
+      body: JSON.stringify({
+        filter:{property:'日付', date:{on_or_after: mondayStr}},
+        page_size: 100
+      })
+    });
+    // 日付ごとに合算
+    const byDate = {};
+    for(const r of d.results){
+      const date = r.properties['日付']?.date?.start;
+      if(!date) continue;
+      const cal = (r.properties['カロリー']?.number || 0) * (r.properties['量(%)']?.number || 1.0);
+      if(!byDate[date]) byDate[date] = 0;
+      byDate[date] += cal;
+    }
+    weekCalories = Object.entries(byDate).map(([date, cal])=>({date, cal}));
+  } catch(e){ console.warn('weekly cal fetch:', e); weekCalories = []; }
 }
 
 async function fullSync(){
@@ -602,14 +729,26 @@ async function fullSync(){
       fetchTodayWeight().catch(e=>console.warn(e)),
       fetchWeekData().catch(e=>console.warn(e)),
       fetchTodayMeals().catch(e=>console.warn(e)),
-      fetchFavorites().catch(e=>console.warn(e))
+      fetchFavorites().catch(e=>console.warn(e)),
+      fetchRewards().catch(e=>console.warn(e)),
+      fetchWeeklyCalories().catch(e=>console.warn(e))
     ]);
     refreshGoals(); refreshHome(); refreshMeals();
     setSync('ok');
+    // 0時前後なら前日レポートを自動表示
+    checkDailyReport();
   } catch(e){ setSync('err'); throw e; }
 }
 
 function refreshHome(){
+  // ダイエット目標
+  if(dietGoals){
+    document.getElementById('goalCard').style.display = 'block';
+    document.getElementById('goalText').textContent = dietGoals;
+  } else {
+    document.getElementById('goalCard').style.display = 'none';
+  }
+
   document.getElementById('weightVal').textContent = todayData.weight ? todayData.weight.toFixed(1) : '--';
   document.getElementById('fatVal').textContent = todayData.fat ? todayData.fat.toFixed(1)+'%' : '--%';
   document.getElementById('bmiVal').textContent = todayData.bmi ? todayData.bmi.toFixed(1) : '--';
@@ -643,6 +782,39 @@ function refreshHome(){
   } else {
     document.getElementById('stepsVal').textContent = '--';
     document.getElementById('stepsLeft').textContent = '--';
+  }
+
+  // 週間平均カロリー
+  if(weekCalories.length){
+    const avg = Math.round(weekCalories.reduce((a,d)=>a+d.cal,0) / weekCalories.length);
+    document.getElementById('weeklyAvgCal').textContent = avg.toLocaleString();
+    document.getElementById('weeklyDays').textContent = weekCalories.length + '日分のデータ';
+  } else {
+    document.getElementById('weeklyAvgCal').textContent = '--';
+    document.getElementById('weeklyDays').textContent = 'まだデータがありません';
+  }
+
+  // ごほうびリスト
+  if(rewards.length){
+    document.getElementById('rewardCard').style.display = 'block';
+    const list = document.getElementById('rewardList');
+    list.innerHTML = '';
+    for(const r of rewards){
+      const item = document.createElement('div');
+      item.className = 'reward-item';
+      let statusBadge = '';
+      if(r.status === '計画中') statusBadge = '<span class="reward-status planning">計画中</span>';
+      else if(r.status === '達成') statusBadge = '<span class="reward-status done">達成</span>';
+      else if(r.status === 'また行きたい') statusBadge = '<span class="reward-status repeat">また行きたい</span>';
+      item.innerHTML = `
+        <div class="reward-name">${escapeHtml(r.name)} ${statusBadge}</div>
+        ${r.memo ? `<div class="reward-memo">${escapeHtml(r.memo)}</div>` : ''}
+        ${r.url ? `<a class="reward-url" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">🔗 リンク</a>` : ''}
+      `;
+      list.appendChild(item);
+    }
+  } else {
+    document.getElementById('rewardCard').style.display = 'none';
   }
 }
 
@@ -835,6 +1007,141 @@ function clearChatHistory(){
   try { localStorage.removeItem('dietApp_chat'); } catch(e){}
   coachInited = false;
   initCoach();
+}
+
+// 日次レポート: 0時を跨いだら前日の振り返りを自動表示
+async function checkDailyReport(){
+  const today = todayStr();
+  const lastReport = localStorage.getItem('dietApp_lastReport') || '';
+  if(lastReport === today) return; // 今日はもう表示済み
+  if(!S.apiKey) return;
+
+  // 昨日の日付
+  const y = new Date(); y.setDate(y.getDate()-1);
+  const yStr = y.toISOString().slice(0,10);
+
+  // 昨日のデータを取得
+  let yMeals = [], yWeight = null, yFat = null, ySteps = null;
+  try {
+    const md = await notionFetch(`https://api.notion.com/v1/databases/${S.mealDbId}/query`,{
+      method:'POST',
+      body: JSON.stringify({filter:{property:'日付', date:{equals: yStr}}})
+    });
+    yMeals = md.results.map(r=>({
+      name: r.properties['食事名']?.title?.[0]?.plain_text || '',
+      timing: r.properties['食事タイミング']?.select?.name || '',
+      cal: (r.properties['カロリー']?.number || 0) * (r.properties['量(%)']?.number || 1),
+      p: (r.properties['P']?.number || 0) * (r.properties['量(%)']?.number || 1),
+      f: (r.properties['F']?.number || 0) * (r.properties['量(%)']?.number || 1),
+      c: (r.properties['C']?.number || 0) * (r.properties['量(%)']?.number || 1)
+    }));
+    const wd = await notionFetch(`https://api.notion.com/v1/databases/${S.dbId}/query`,{
+      method:'POST',
+      body: JSON.stringify({filter:{property:'日付', date:{equals: yStr}}, page_size:1})
+    });
+    if(wd.results.length){
+      const p = wd.results[0].properties;
+      yWeight = p['体重']?.number;
+      yFat = p['体脂肪率']?.number;
+      ySteps = p['歩数']?.number;
+    }
+  } catch(e){ console.warn('昨日のデータ取得失敗:', e); return; }
+
+  if(!yMeals.length && !yWeight && !ySteps){
+    // データがない日はレポートしない
+    localStorage.setItem('dietApp_lastReport', today);
+    return;
+  }
+
+  // 昨日のサマリー作成
+  let totCal=0, totP=0, totF=0, totC=0;
+  for(const m of yMeals){ totCal+=m.cal; totP+=m.p; totF+=m.f; totC+=m.c; }
+  let mealsSummary = '';
+  for(const m of yMeals) mealsSummary += `- [${m.timing}] ${m.name} (${Math.round(m.cal)}kcal)\n`;
+
+  const w = yWeight || todayData.weight || 49.5;
+  const pGoal = Math.round(w * S.goalPRatio);
+  const reportPrompt = `__DAILY_REPORT__ 昨日(${yStr})の記録:
+体重: ${yWeight || '記録なし'}kg / 体脂肪率: ${yFat || '?'}% / 歩数: ${ySteps?.toLocaleString() || '?'}歩
+カロリー: ${Math.round(totCal)}/${S.goalCal}kcal
+PFC: P${Math.round(totP)}/${pGoal}g+ F${Math.round(totF)}/${S.goalF}g C${Math.round(totC)}g
+食事:
+${mealsSummary || '(記録なし)'}
+
+昨日の振り返りと今日のアドバイスを短くお願い。`;
+
+  // 履歴に積まずに直接レポート表示
+  if(!coachInited){
+    coachInited = true;
+    // 既存履歴があれば復元
+    if(!loadChatHistory()){
+      // 初回挨拶の代わりにレポートだけ表示
+    }
+  }
+
+  const h = document.getElementById('coachHistory');
+  const loading = document.getElementById('coachLoading');
+  if(loading) loading.style.display = 'none';
+
+  // レポート見出し
+  const headDiv = document.createElement('div');
+  headDiv.style.cssText = 'text-align:center;padding:8px;color:#A08AFF;font-size:11px;font-weight:700;letter-spacing:0.5px';
+  headDiv.textContent = '── 📅 ' + yStr + ' のレポート ──';
+  h.appendChild(headDiv);
+
+  // 考え中表示
+  const thinking = document.createElement('div');
+  thinking.className = 'thinking';
+  thinking.id = 'thinking-report';
+  thinking.textContent = '昨日の振り返りを書いています...';
+  h.appendChild(thinking);
+  h.scrollTop = h.scrollHeight;
+
+  try {
+    const sys = `あなたはほし(Cherubi)さんのフレンドリーなダイエットコーチです。
+プロフィール: 身長${S.height}cm、目標体重48kg、目標体脂肪率22%
+PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
+
+ユーザーから __DAILY_REPORT__ で始まるメッセージが来た場合、昨日の振り返りと今日のアドバイスを以下の構成で短くまとめてください：
+1. 昨日の良かったこと（褒める）
+2. 改善ポイント（あれば）
+3. 今日の目標・アドバイス
+
+絵文字を使ってフレンドリーに、4〜6行程度で。<meal_data>は出さないでください。`;
+
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens: 600,
+        system: sys,
+        messages: [{role:'user', content: reportPrompt}]
+      })
+    });
+    if(!r.ok){
+      const t = await r.text();
+      throw new Error('API '+r.status+': '+t.slice(0,80));
+    }
+    const d = await r.json();
+    const replyText = d.content
+      .filter(c => c.type === 'text')
+      .map(c => c.text)
+      .join('\n');
+    document.getElementById('thinking-report')?.remove();
+    addBubble('bot', replyText);
+    chatHistory.push({role:'assistant', content: replyText});
+    saveChatHistory();
+    localStorage.setItem('dietApp_lastReport', today);
+  } catch(e){
+    document.getElementById('thinking-report')?.remove();
+    console.warn('日次レポート失敗:', e);
+  }
 }
 
 function buildCoachContext(){
@@ -1249,6 +1556,7 @@ function switchTab(tab, btn){
 (async function init(){
   await initImageDB();
   loadSettings();
+  selectedDate = todayStr();
   buildWeekCal();
   if(S.notionKey){
     try { await fullSync(); } catch(e){ console.warn(e); }
