@@ -1470,8 +1470,9 @@ async function initCoach(){
 }
 
 function compressImage(dataUrl, maxBytes){
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
+    img.onerror = () => reject(new Error('画像を読み込めませんでした'));
     img.onload = () => {
       const canvas = document.createElement('canvas');
       // 長辺を1600px以内にリサイズ
@@ -1483,11 +1484,11 @@ function compressImage(dataUrl, maxBytes){
       }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      // base64サイズが maxBytes 以下になるまで quality を下げる
+      // base64サイズが maxBytes 以下になるまで quality を下げる（最低0.1まで）
       let quality = 0.85;
       let result = canvas.toDataURL('image/jpeg', quality);
-      while(result.length * 0.75 > maxBytes && quality > 0.3){
-        quality -= 0.1;
+      while(result.length * 0.75 > maxBytes && quality > 0.1){
+        quality -= 0.05;
         result = canvas.toDataURL('image/jpeg', quality);
       }
       resolve(result);
@@ -1502,15 +1503,15 @@ function handlePhotoAttach(e){
   const reader = new FileReader();
   reader.onload = async ev => {
     const raw = ev.target.result;
-    const rawType = raw.match(/^data:([^;]+);/)?.[1] || '';
-    const supported = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const tooBig = raw.length * 0.75 > 5 * 1024 * 1024;
-    const unsupported = !supported.includes(rawType);
-    const dataUrl = (tooBig || unsupported)
-      ? await compressImage(raw, 4 * 1024 * 1024)
-      : raw;
-    const mediaType = (tooBig || unsupported) ? 'image/jpeg' : rawType;
-    attachedImage = {dataUrl, mediaType};
+    let dataUrl;
+    try {
+      // サイズ・フォーマット問わず常にJPEG圧縮（4MB以下に確実に収める）
+      dataUrl = await compressImage(raw, 4 * 1024 * 1024);
+    } catch(e) {
+      addBubble('bot', '⚠️ 画像を読み込めませんでした。別の画像をお試しください。');
+      return;
+    }
+    attachedImage = {dataUrl, mediaType: 'image/jpeg'};
     document.getElementById('attachedImg').src = dataUrl;
     document.getElementById('attachedPreview').style.display = 'flex';
     document.getElementById('attachBtn').classList.add('has-image');
