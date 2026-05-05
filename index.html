@@ -1469,13 +1469,45 @@ async function initCoach(){
   addBubble('bot', msg);
 }
 
+function compressImage(dataUrl, maxBytes){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // 長辺を1600px以内にリサイズ
+      const MAX_PX = 1600;
+      let w = img.width, h = img.height;
+      if(w > MAX_PX || h > MAX_PX){
+        if(w > h){ h = Math.round(h * MAX_PX / w); w = MAX_PX; }
+        else { w = Math.round(w * MAX_PX / h); h = MAX_PX; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // base64サイズが maxBytes 以下になるまで quality を下げる
+      let quality = 0.85;
+      let result = canvas.toDataURL('image/jpeg', quality);
+      while(result.length * 0.75 > maxBytes && quality > 0.3){
+        quality -= 0.1;
+        result = canvas.toDataURL('image/jpeg', quality);
+      }
+      resolve(result);
+    };
+    img.src = dataUrl;
+  });
+}
+
 function handlePhotoAttach(e){
   const file = e.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
-    attachedImage = {dataUrl: ev.target.result, mediaType: file.type || 'image/jpeg'};
-    document.getElementById('attachedImg').src = attachedImage.dataUrl;
+  reader.onload = async ev => {
+    const raw = ev.target.result;
+    // 5MB上限（base64換算）を超えていたら圧縮
+    const dataUrl = raw.length * 0.75 > 5 * 1024 * 1024
+      ? await compressImage(raw, 4 * 1024 * 1024)
+      : raw;
+    attachedImage = {dataUrl, mediaType: 'image/jpeg'};
+    document.getElementById('attachedImg').src = dataUrl;
     document.getElementById('attachedPreview').style.display = 'flex';
     document.getElementById('attachBtn').classList.add('has-image');
     document.getElementById('chatInput').placeholder = '補足があれば...（なくてもOK）';
