@@ -1490,6 +1490,19 @@ function clearAttachment(){
   document.getElementById('chatInput').placeholder = '食事を記録 or 相談...';
 }
 
+function sanitizeHistory(msgs){
+  // 空コンテンツを除外
+  const filtered = msgs.filter(m => {
+    const c = m.content;
+    if(typeof c === 'string') return c.trim().length > 0;
+    if(Array.isArray(c)) return c.length > 0;
+    return false;
+  });
+  // userメッセージから始まるよう先頭のassistantを除去
+  while(filtered.length > 0 && filtered[0].role !== 'user') filtered.shift();
+  return filtered;
+}
+
 async function sendChat(){
   const input = document.getElementById('chatInput');
   let msg = input.value.trim();
@@ -1585,19 +1598,19 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
         max_tokens: 1500,
         system: sys,
         tools: [{type:'web_search_20250305', name:'web_search', max_uses: 3}],
-        messages: chatHistory.slice(-10)
+        messages: sanitizeHistory(chatHistory.slice(-10))
       })
     });
     if(!r.ok){
       const t = await r.text();
-      throw new Error('API '+r.status+': '+t.slice(0,80));
+      throw new Error('API '+r.status+': '+t.slice(0,200));
     }
     const d = await r.json();
     const replyText = d.content
       .filter(c => c.type === 'text')
       .map(c => c.text)
       .join('\n');
-    chatHistory.push({role:'assistant', content: replyText});
+    if(replyText) chatHistory.push({role:'assistant', content: replyText});
     saveChatHistory();
 
     document.getElementById('thinking-msg')?.remove();
