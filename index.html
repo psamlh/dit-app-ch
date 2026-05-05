@@ -1837,7 +1837,7 @@ async function loadGraphData(days){
 
 // データを期間に応じて集計
 function aggregateData(data, days){
-  if(days === 7){
+  if(days === 7 || days === 30){
     return data.map(d => ({
       label: d.date,
       weight: d.weight,
@@ -1845,11 +1845,11 @@ function aggregateData(data, days){
       steps: d.steps
     }));
   }
-  // 30日: 今日を起点に7日ずつグループ化
-  if(days === 30){
+  // 90日: 今日を起点に7日ずつグループ化
+  if(days === 90){
     const today = new Date(); today.setHours(0,0,0,0);
     const groups = [];
-    for(let g = 0; g < 5; g++){
+    for(let g = 0; g < 13; g++){
       const endDate = new Date(today); endDate.setDate(today.getDate() - g * 7);
       const startDate = new Date(endDate); startDate.setDate(endDate.getDate() - 6);
       groups.push({startDate, endDate, items: []});
@@ -1874,29 +1874,6 @@ function aggregateData(data, days){
         steps: ss.length ? Math.round(ss.reduce((a,x)=>a+x,0)/ss.length) : null
       };
     });
-  }
-  // 90日: 週平均
-  if(days === 90){
-    const byWeek = {};
-    for(const d of data){
-      if(!d.date) continue;
-      const dt = new Date(d.date);
-      const dayOfWeek = dt.getDay();
-      const offsetToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const monday = new Date(dt);
-      monday.setDate(dt.getDate() + offsetToMonday);
-      const key = localDateStr(monday);
-      if(!byWeek[key]) byWeek[key] = {w:[], f:[], s:[]};
-      if(d.weight) byWeek[key].w.push(d.weight);
-      if(d.fat) byWeek[key].f.push(d.fat);
-      if(d.steps) byWeek[key].s.push(d.steps);
-    }
-    return Object.entries(byWeek).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({
-      label: k,
-      weight: v.w.length ? v.w.reduce((a,x)=>a+x,0)/v.w.length : null,
-      fat: v.f.length ? v.f.reduce((a,x)=>a+x,0)/v.f.length : null,
-      steps: v.s.length ? Math.round(v.s.reduce((a,x)=>a+x,0)/v.s.length) : null
-    }));
   }
   // 1年: 月平均
   if(days === 365){
@@ -2091,7 +2068,7 @@ function attachGraphInteraction(svg, aggregated, period){
 
 function formatGraphLabel(label, period){
   if(!label) return '';
-  if(period === 7){
+  if(period === 7 || period === 30){
     // YYYY-MM-DD → MM/DD (曜日)
     const dt = new Date(label);
     const m = dt.getMonth()+1;
@@ -2099,17 +2076,9 @@ function formatGraphLabel(label, period){
     const w = ['日','月','火','水','木','金','土'][dt.getDay()];
     return `${m}/${d}(${w})`;
   }
-  if(period === 30){
+  if(period === 90){
     // 既に "M/D~M/D" 形式
     return label;
-  }
-  if(period === 90){
-    // 月の何週目かを表示
-    const dt = new Date(label);
-    const m = dt.getMonth()+1;
-    const day = dt.getDate();
-    const weekNum = Math.ceil(day / 7);
-    return `${m}月第${weekNum}週`;
   }
   if(period === 365){
     // YYYY-MM → ◯月
@@ -2133,7 +2102,7 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
   const ticks = [];
   for(let i = 3; i >= 0; i--){
     const raw = Math.round(mx * i / 3);
-    ticks.push(unit === '歩' ? Math.round(raw / 100) * 100 : raw);
+    ticks.push(unit === '歩' ? Math.round(raw / 1000) * 1000 : raw);
   }
   let yAxisHtml = '<div class="bar-yaxis">' +
     ticks.map(t => `<span>${t.toLocaleString()}</span>`).join('') +
@@ -2143,16 +2112,17 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
     const h = Math.max(4, v/mx*100);
     let lbl = '';
     if(showLabel && labels[i]){
-      if(period === 7){
+      if(period === 7 || period === 30){
         const dt = new Date(labels[i]);
         lbl = days[dt.getDay()];
-      } else if(period === 30){
+      } else if(period === 90){
         lbl = labels[i]; // "M/D~M/D" 形式をそのまま表示
       } else {
         lbl = labels[i].slice(5);
       }
     }
     return `<div class="bar-wrap">
+      <span class="bar-val">${v > 0 && period === 7 ? Math.round(v).toLocaleString() : ''}</span>
       <div class="bar" style="height:${h}%;background:${col}"></div>
       <span class="bar-lbl">${lbl}</span>
     </div>`;
