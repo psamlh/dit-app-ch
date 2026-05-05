@@ -260,7 +260,7 @@ button,input,select{font-family:inherit;color:inherit}
         <button class="clear-btn" onclick="clearAttachment()">×</button>
       </div>
       <div class="chip-row">
-        <button class="chip" onclick="sendChip('今日の分析をお願い')">今日の分析</button>
+        <button class="chip" onclick="sendChip('現状の分析をお願い')">現状の分析</button>
         <button class="chip" onclick="sendChip('夜ご飯は何を食べればいい？')">夜ご飯は？</button>
         <button class="chip" onclick="sendChip('残りの調整について相談したい')">残りの調整</button>
         <button class="chip" onclick="reshowCards()">📋 カード再表示</button>
@@ -872,8 +872,8 @@ function refreshHome(){
     calLeftEl.textContent = calLeftMax.toFixed(1);
     calLeftEl.style.color = '#FF8FAD';
   }
-  // カロリーバー：スケールはmax * 1.3まで（少し余裕を持たせる）
-  const barScale = S.goalCalMax * 1.3;
+  // カロリーバー：通常時はMAX=goalCalMax、超過時はtCalがMAX（相対的にマーカーがずれる）
+  const barScale = Math.max(S.goalCalMax, tCal) || S.goalCalMax;
   // 通常部分：0〜下限(min)、超過部分：下限以降
   const normalEnd = Math.min(tCal, S.goalCalMin);
   const overAmount = Math.max(0, tCal - S.goalCalMin);
@@ -1837,13 +1837,43 @@ async function loadGraphData(days){
 
 // データを期間に応じて集計
 function aggregateData(data, days){
-  if(days === 7 || days === 30){
+  if(days === 7){
     return data.map(d => ({
       label: d.date,
       weight: d.weight,
       fat: d.fat,
       steps: d.steps
     }));
+  }
+  // 30日: 今日を起点に7日ずつグループ化
+  if(days === 30){
+    const today = new Date(); today.setHours(0,0,0,0);
+    const groups = [];
+    for(let g = 0; g < 5; g++){
+      const endDate = new Date(today); endDate.setDate(today.getDate() - g * 7);
+      const startDate = new Date(endDate); startDate.setDate(endDate.getDate() - 6);
+      groups.push({startDate, endDate, items: []});
+    }
+    for(const d of data){
+      if(!d.date) continue;
+      const dt = new Date(d.date); dt.setHours(0,0,0,0);
+      for(const g of groups){
+        if(dt >= g.startDate && dt <= g.endDate){ g.items.push(d); break; }
+      }
+    }
+    return groups.filter(g => g.items.length > 0).reverse().map(g => {
+      const ws = g.items.filter(d => d.weight != null).map(d => d.weight);
+      const fs = g.items.filter(d => d.fat != null).map(d => d.fat);
+      const ss = g.items.filter(d => d.steps != null).map(d => d.steps);
+      const sm = (g.startDate.getMonth()+1) + '/' + g.startDate.getDate();
+      const em = (g.endDate.getMonth()+1) + '/' + g.endDate.getDate();
+      return {
+        label: sm + '~' + em,
+        weight: ws.length ? ws.reduce((a,x)=>a+x,0)/ws.length : null,
+        fat: fs.length ? fs.reduce((a,x)=>a+x,0)/fs.length : null,
+        steps: ss.length ? Math.round(ss.reduce((a,x)=>a+x,0)/ss.length) : null
+      };
+    });
   }
   // 90日: 週平均
   if(days === 90){
@@ -1934,7 +1964,9 @@ function renderGraphs(){
     wTicks.forEach((val, idx)=>{
       const y = 80 - (val - wMin)/wRange*70;
       html += `<line x1="${xStart}" y1="${y}" x2="${xEnd}" y2="${y}" stroke="#f5edff" stroke-width="0.5"/>`;
-      html += `<text x="${xStart-2}" y="${y+3}" text-anchor="end" font-size="7" fill="#FF8FAD">${val.toFixed(1)}</text>`;
+      if(idx > 0){
+        html += `<text x="${xStart-2}" y="${y+3}" text-anchor="end" font-size="7" fill="#FF8FAD">${val.toFixed(1)}</text>`;
+      }
     });
     // 体脂肪率メモリ（右側、データある時のみ）
     if(fs.length){
@@ -1942,9 +1974,11 @@ function renderGraphs(){
       for(let i = 0; i <= 3; i++){
         fTicks.push(fMin + (fRange * i / 3));
       }
-      fTicks.forEach(val=>{
+      fTicks.forEach((val, idx)=>{
         const y = 80 - (val - fMin)/fRange*70;
-        html += `<text x="${xEnd+2}" y="${y+3}" text-anchor="start" font-size="7" fill="#A08AFF">${val.toFixed(1)}</text>`;
+        if(idx > 0){
+          html += `<text x="${xEnd+2}" y="${y+3}" text-anchor="start" font-size="7" fill="#A08AFF">${val.toFixed(1)}</text>`;
+        }
       });
     }
 
@@ -1969,26 +2003,22 @@ function renderGraphs(){
       html += `<polyline points="${wpts.join(' ')}" fill="none" stroke="#FFB5C8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
     }
     const showLabels = n <= 14;
-    // 体脂肪率の点とラベル（7日のとき表示）
+    // 体脂肪率の点（7日のとき表示、数字ラベルなし）
     if(currentPeriod === 7 && fs.length){
       aggregated.forEach((d,i)=>{
         if(d.fat == null) return;
         const x = i*xStep + xStart;
         const y = 80 - (d.fat-fMin)/fRange*70;
         html += `<circle cx="${x}" cy="${y}" r="2.5" fill="#A08AFF" opacity="0.7"/>`;
-        html += `<text x="${x}" y="${y+12}" text-anchor="middle" font-size="8" fill="#A08AFF" opacity="0.8">${d.fat.toFixed(1)}</text>`;
       });
     }
-    // 体重の点とラベル + 透明ヒット領域（タップしやすく）
+    // 体重の点 + 透明ヒット領域（タップしやすく）
     aggregated.forEach((d,i)=>{
       if(d.weight == null) return;
       const x = i*xStep + xStart;
       const y = 80 - (d.weight-wMin)/wRange*70;
       // 見た目の点
       html += `<circle cx="${x}" cy="${y}" r="${n>30?2:3.5}" fill="#FF8FAD"/>`;
-      if(showLabels){
-        html += `<text x="${x}" y="${y-8}" text-anchor="middle" font-size="9" fill="#9B8FAE">${d.weight.toFixed(1)}</text>`;
-      }
       // 透明な大きいヒット領域（タップ・ホバー検出用）
       html += `<circle cx="${x}" cy="${y}" r="10" fill="transparent" data-graph-pt="${i}" style="cursor:pointer"/>`;
     });
@@ -2061,13 +2091,17 @@ function attachGraphInteraction(svg, aggregated, period){
 
 function formatGraphLabel(label, period){
   if(!label) return '';
-  if(period === 7 || period === 30){
+  if(period === 7){
     // YYYY-MM-DD → MM/DD (曜日)
     const dt = new Date(label);
     const m = dt.getMonth()+1;
     const d = dt.getDate();
     const w = ['日','月','火','水','木','金','土'][dt.getDay()];
     return `${m}/${d}(${w})`;
+  }
+  if(period === 30){
+    // 既に "M/D~M/D" 形式
+    return label;
   }
   if(period === 90){
     // 月の何週目かを表示
@@ -2098,7 +2132,8 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
   // 縦軸メモリ（4段階）
   const ticks = [];
   for(let i = 3; i >= 0; i--){
-    ticks.push(Math.round(mx * i / 3));
+    const raw = Math.round(mx * i / 3);
+    ticks.push(unit === '歩' ? Math.round(raw / 100) * 100 : raw);
   }
   let yAxisHtml = '<div class="bar-yaxis">' +
     ticks.map(t => `<span>${t.toLocaleString()}</span>`).join('') +
@@ -2108,12 +2143,16 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
     const h = Math.max(4, v/mx*100);
     let lbl = '';
     if(showLabel && labels[i]){
-      const dt = new Date(labels[i]);
-      if(period === 7 || period === 30) lbl = days[dt.getDay()];
-      else lbl = labels[i].slice(5);
+      if(period === 7){
+        const dt = new Date(labels[i]);
+        lbl = days[dt.getDay()];
+      } else if(period === 30){
+        lbl = labels[i]; // "M/D~M/D" 形式をそのまま表示
+      } else {
+        lbl = labels[i].slice(5);
+      }
     }
     return `<div class="bar-wrap">
-      <span class="bar-val">${v>0 && vals.length<=14 ? Math.round(v).toLocaleString() : ''}</span>
       <div class="bar" style="height:${h}%;background:${col}"></div>
       <span class="bar-lbl">${lbl}</span>
     </div>`;
