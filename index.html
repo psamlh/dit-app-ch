@@ -140,9 +140,9 @@ button,input,select{font-family:inherit;color:inherit}
 .mini-graph{display:flex;height:90px;position:relative;margin-top:4px;padding-bottom:14px;max-width:600px;margin-left:auto;margin-right:auto;gap:4px}
 .bar-yaxis{display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:#9B8FAE;width:30px;flex-shrink:0;text-align:right;padding-right:2px;padding-bottom:14px}
 .bar-area{flex:1;display:flex;align-items:flex-end;gap:3px;border-left:1px solid #f5edff;padding-left:4px}
-.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end}
+.bar-wrap{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end;overflow:hidden}
 .bar{width:100%;border-radius:4px 4px 0 0;min-height:4px}
-.bar-lbl,.bar-val{font-size:8px;color:#9B8FAE}
+.bar-lbl,.bar-val{font-size:8px;color:#9B8FAE;max-width:100%;overflow:hidden;white-space:nowrap}
 .graph-avg{font-size:11px;color:#9B8FAE;background:#F5F0FF;padding:2px 8px;border-radius:8px;margin-left:6px}
 .setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f9f4ff;gap:8px}
 .setting-row:last-child{border-bottom:none}
@@ -1502,11 +1502,15 @@ function handlePhotoAttach(e){
   const reader = new FileReader();
   reader.onload = async ev => {
     const raw = ev.target.result;
-    // 5MB上限（base64換算）を超えていたら圧縮
-    const dataUrl = raw.length * 0.75 > 5 * 1024 * 1024
+    const rawType = raw.match(/^data:([^;]+);/)?.[1] || '';
+    const supported = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const tooBig = raw.length * 0.75 > 5 * 1024 * 1024;
+    const unsupported = !supported.includes(rawType);
+    const dataUrl = (tooBig || unsupported)
       ? await compressImage(raw, 4 * 1024 * 1024)
       : raw;
-    attachedImage = {dataUrl, mediaType: 'image/jpeg'};
+    const mediaType = (tooBig || unsupported) ? 'image/jpeg' : rawType;
+    attachedImage = {dataUrl, mediaType};
     document.getElementById('attachedImg').src = dataUrl;
     document.getElementById('attachedPreview').style.display = 'flex';
     document.getElementById('attachBtn').classList.add('has-image');
@@ -2161,7 +2165,7 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
         const dt = new Date(labels[i]);
         lbl = days[dt.getDay()];
       } else if(period === 90){
-        lbl = labels[i]; // "M/D~M/D" 形式をそのまま表示
+        lbl = labels[i].split('~')[0]; // "4/29" のみ表示（幅節約）
       } else {
         lbl = labels[i].slice(5);
       }
