@@ -610,7 +610,7 @@ async function fetchTodayWeight(){
       page_size: 7
     })
   });
-  todayData = {weight:null, fat:null, bmi:null, steps:null};
+  todayData = {weight:null, fat:null, bmi:null, steps:null, pageId:null};
   yesterdayWeight = null;
   if(d.results.length){
     const tdy = d.results.find(r=> r.properties['日付']?.date?.start === today);
@@ -621,9 +621,20 @@ async function fetchTodayWeight(){
       todayData.fat = (fatVal && fatVal > 0) ? fatVal : null;
       todayData.bmi = p['BMI']?.formula?.number;
       todayData.steps = p['歩数']?.number;
+      todayData.pageId = tdy.id;
+      // Notionのメモをlocalに同期（Notion側が正）
+      const notionMemo = p['メモ']?.rich_text?.[0]?.plain_text;
+      if(notionMemo != null) localStorage.setItem('coachMemo', notionMemo);
     }
     const ydy = d.results.find(r=> r.properties['日付']?.date?.start === yStr);
-    if(ydy) yesterdayWeight = ydy.properties['体重']?.number;
+    if(ydy){
+      yesterdayWeight = ydy.properties['体重']?.number;
+      // 今日のメモがなければ昨日のメモを引き継ぎ
+      if(!localStorage.getItem('coachMemo')){
+        const ydyMemo = ydy.properties['メモ']?.rich_text?.[0]?.plain_text;
+        if(ydyMemo) localStorage.setItem('coachMemo', ydyMemo);
+      }
+    }
   }
 }
 async function fetchWeekData(){
@@ -1455,10 +1466,22 @@ function loadMemo(){
   updateMemoPreview();
 }
 function saveMemo(){
-  const text = document.getElementById('memoText').value;
-  localStorage.setItem('coachMemo', text.trim());
+  const text = document.getElementById('memoText').value.trim();
+  localStorage.setItem('coachMemo', text);
   updateMemoPreview();
   showToast('✅ ライフログを保存しました');
+  saveMemoToNotion(text).catch(e => console.warn('Notion memo save error:', e));
+}
+async function saveMemoToNotion(text){
+  if(!S.notionKey || !todayData.pageId) return;
+  await notionFetch(`https://api.notion.com/v1/pages/${todayData.pageId}`,{
+    method:'PATCH',
+    body: JSON.stringify({
+      properties:{
+        'メモ':{rich_text: text ? [{type:'text', text:{content: text.slice(0,2000)}}] : []}
+      }
+    })
+  });
 }
 function updateMemoPreview(){
   const text = (document.getElementById('memoText')?.value || localStorage.getItem('coachMemo') || '').trim();
