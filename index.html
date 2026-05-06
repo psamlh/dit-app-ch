@@ -143,6 +143,15 @@ button,input,select{font-family:inherit;color:inherit}
 .bar-wrap{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end;overflow:hidden}
 .bar{width:100%;border-radius:4px 4px 0 0;min-height:4px}
 .bar-lbl,.bar-val{font-size:8px;color:#9B8FAE;max-width:100%;overflow:hidden;white-space:nowrap}
+.memo-bar{background:#fff;border-bottom:1px solid #f0e8f5;flex-shrink:0}
+.memo-bar-head{display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:pointer;user-select:none}
+.memo-bar-title{font-size:11px;font-weight:700;color:#A08AFF;flex-shrink:0}
+.memo-bar-preview{font-size:11px;color:#9B8FAE;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.memo-bar-toggle{font-size:10px;color:#C9B8FF;transition:transform .2s;flex-shrink:0}
+.memo-bar-body{padding:0 10px 10px;display:none}
+.memo-bar-body.open{display:block}
+.memo-textarea{width:100%;border:1px solid #e8dcf5;border-radius:10px;padding:8px 10px;font-size:12px;font-family:inherit;color:#4A3F5C;background:#FDF5FF;resize:none;min-height:66px;line-height:1.5;box-sizing:border-box}
+.memo-save-btn{margin-top:6px;float:right;padding:5px 14px;border-radius:10px;background:linear-gradient(135deg,#C9B8FF,#A08AFF);color:#fff;border:none;font-size:12px;cursor:pointer;font-weight:700}
 .graph-avg{font-size:11px;color:#9B8FAE;background:#F5F0FF;padding:2px 8px;border-radius:8px;margin-left:6px}
 .setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f9f4ff;gap:8px}
 .setting-row:last-child{border-bottom:none}
@@ -251,6 +260,19 @@ button,input,select{font-family:inherit;color:inherit}
   </div>
 
   <div class="coach-wrap" id="coachPage">
+    <div class="memo-bar">
+      <div class="memo-bar-head" onclick="toggleMemoBar()">
+        <span style="font-size:13px">📋</span>
+        <span class="memo-bar-title">ライフログ</span>
+        <span class="memo-bar-preview" id="memoBarPreview">予定・体調メモ（タップで編集）</span>
+        <span class="memo-bar-toggle" id="memoBarToggle">▼</span>
+      </div>
+      <div class="memo-bar-body" id="memoBarBody">
+        <textarea class="memo-textarea" id="memoText" placeholder="例: 明日会食あり、今週生理中、今日筋トレした、昨日は外食で塩分多め...&#10;コーチがこの情報を参考にアドバイスします。"></textarea>
+        <button class="memo-save-btn" onclick="saveMemo()">保存</button>
+        <div style="clear:both"></div>
+      </div>
+    </div>
     <div class="coach-history" id="coachHistory">
       <div class="empty-text" id="coachLoading">データを読み込んでいます...</div>
     </div>
@@ -1423,6 +1445,93 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
   }
 }
 
+// ────── ライフログ・過去データ ──────
+let recentMealsCache = null; // {data: {date: meals[]}, fetchedAt}
+
+function loadMemo(){
+  const saved = localStorage.getItem('coachMemo') || '';
+  const ta = document.getElementById('memoText');
+  if(ta) ta.value = saved;
+  updateMemoPreview();
+}
+function saveMemo(){
+  const text = document.getElementById('memoText').value;
+  localStorage.setItem('coachMemo', text.trim());
+  updateMemoPreview();
+  showToast('✅ ライフログを保存しました');
+}
+function updateMemoPreview(){
+  const text = (document.getElementById('memoText')?.value || localStorage.getItem('coachMemo') || '').trim();
+  const el = document.getElementById('memoBarPreview');
+  if(el) el.textContent = text ? text.slice(0,36) + (text.length > 36 ? '…' : '') : '予定・体調メモ（タップで編集）';
+}
+function toggleMemoBar(){
+  const body = document.getElementById('memoBarBody');
+  const toggle = document.getElementById('memoBarToggle');
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  toggle.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+async function fetchRecentMeals(){
+  if(!S.mealDbId || !S.notionKey) return;
+  const now = Date.now();
+  if(recentMealsCache && now - recentMealsCache.fetchedAt < 30 * 60 * 1000) return;
+  const start = new Date(); start.setDate(start.getDate() - 4);
+  try {
+    const d = await notionFetch(`https://api.notion.com/v1/databases/${S.mealDbId}/query`,{
+      method:'POST',
+      body: JSON.stringify({
+        filter:{and:[
+          {property:'日付', date:{on_or_after: localDateStr(start)}},
+          {property:'日付', date:{before: todayStr()}}
+        ]},
+        sorts:[{property:'日付', direction:'ascending'}],
+        page_size: 100
+      })
+    });
+    const byDate = {};
+    for(const r of d.results){
+      const dt = r.properties['日付']?.date?.start;
+      if(!dt) continue;
+      if(!byDate[dt]) byDate[dt] = [];
+      byDate[dt].push({
+        name: r.properties['食事名']?.title?.[0]?.plain_text || '',
+        cal: r.properties['カロリー']?.number || 0,
+        timing: r.properties['食事タイミング']?.select?.name || '',
+        amount: (r.properties['量(%)']?.number || 1.0) * 100
+      });
+    }
+    recentMealsCache = {data: byDate, fetchedAt: now};
+  } catch(e){ console.warn('recentMeals fetch error:', e); }
+}
+
+function buildWeeklyTrendText(){
+  const today = todayStr();
+  const wdays = ['日','月','火','水','木','金','土'];
+  const recent = weekData.filter(d => d.date && d.date < today && d.weight);
+  if(!recent.length) return '(データなし)';
+  return recent.slice(-6).map(d => {
+    const dt = new Date(d.date);
+    let line = `${dt.getMonth()+1}/${dt.getDate()}(${wdays[dt.getDay()]}): 体重${d.weight}kg`;
+    if(d.fat) line += ` 体脂肪${d.fat}%`;
+    if(d.steps) line += ` 歩数${d.steps.toLocaleString()}歩`;
+    return line;
+  }).join('\n');
+}
+
+function buildRecentMealsText(){
+  if(!recentMealsCache?.data) return '';
+  const wdays = ['日','月','火','水','木','金','土'];
+  return Object.entries(recentMealsCache.data).sort().map(([date, ms]) => {
+    const dt = new Date(date);
+    const label = `${dt.getMonth()+1}/${dt.getDate()}(${wdays[dt.getDay()]})`;
+    const totalCal = Math.round(ms.reduce((s,m) => s + m.cal * m.amount/100, 0));
+    const names = ms.map(m => m.name).join('・');
+    return `${label}: ${totalCal}kcal（${names}）`;
+  }).join('\n');
+}
+
 function buildCoachContext(){
   const w = todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
@@ -1572,7 +1681,11 @@ async function sendChat(){
   h.appendChild(thinking);
   h.scrollTop = h.scrollHeight;
 
+  await fetchRecentMeals();
   const ctx = buildCoachContext();
+  const weekTrend = buildWeeklyTrendText();
+  const recentMeals = buildRecentMealsText();
+  const lifeMemo = localStorage.getItem('coachMemo') || '';
   const sys = `あなたはほし(Cherubi)さんのフレンドリーなダイエットコーチです。
 ユーザーのプロフィール: 身長${S.height}cm、目標体重48kg
 今日の状況:
@@ -1583,6 +1696,15 @@ async function sendChat(){
 - 炭水化物 ${ctx.tC.toFixed(1)}g
 - 歩数 ${ctx.steps}歩（目標${S.goalSteps}歩・週平均で見る）
 - 今日の食事:\n${ctx.mealsText}
+
+【直近の体重・歩数推移（〜昨日）】
+${weekTrend}
+${recentMeals ? '\n【直近の食事記録（〜昨日）】\n' + recentMeals : ''}
+【ライフログ・予定メモ（ユーザー入力）】
+${lifeMemo || '(なし)'}
+
+↑ 上記の過去データとメモを踏まえて数日スパンで考察してください。
+例:「昨日の食事で塩分が多かったから今日の体重増は水分保持かも」「明日会食があるなら今日は少し控えめにしよう」「生理周期で体重が増えやすい時期」など、断片的な今日の記録だけでなく流れを読んだアドバイスをしてください。
 
 PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 歩数は1日単位ではなく週平均（月〜日）で評価する（休日は少なくてOK）。
@@ -2214,6 +2336,7 @@ function switchTab(tab, btn){
   loadSettings();
   selectedDate = todayStr();
   buildWeekCal();
+  loadMemo();
   if(S.notionKey){
     try { await fullSync(); } catch(e){ console.warn(e); }
   } else {
