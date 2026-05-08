@@ -419,7 +419,7 @@ const S = {
   goalCal:1350, goalCalMin:1300, goalCalMax:1400,
   goalPRatio:1.6, goalF:45, goalSteps:7000, height:159
 };
-let meals=[], favorites=[], weekData=[], chatHistory=[];
+let meals=[], todayMeals=[], favorites=[], weekData=[], chatHistory=[];
 let rewards=[], dietGoals='';
 let todayData = {weight:null, fat:null, bmi:null, steps:null};
 let yesterdayWeight = null;
@@ -675,6 +675,8 @@ async function fetchMealsForDate(dateStr){
     c: r.properties['C']?.number || 0,
     amount: (r.properties['量(%)']?.number || 1.0) * 100
   }));
+  // 今日の食事を取得したときは todayMeals にも同期
+  if(target === todayStr()) todayMeals = [...meals];
 }
 async function fetchTodayMeals(){
   return fetchMealsForDate(todayStr());
@@ -890,7 +892,7 @@ function refreshHome(){
     diffEl.textContent = '--'; diffEl.className = 'weight-badge same';
   }
   let tCal=0, tP=0, tF=0, tC=0;
-  for(const m of meals){
+  for(const m of todayMeals){
     const r = m.amount/100;
     tCal += m.cal*r; tP += m.p*r; tF += m.f*r; tC += m.c*r;
   }
@@ -1139,7 +1141,8 @@ async function saveFavMeal(){
   closeModal('favConfirmModal');
   try {
     const id = await createMealRecord(meal);
-    meals.push({...meal, id});
+    todayMeals.push({...meal, id}); // 今日の集計に必ず反映
+    if(selectedDate === todayStr()) meals = [...todayMeals]; // 今日を表示中なら表示も更新
     refreshMeals(); refreshHome();
     showToast('✓ 記録しました');
   } catch(e){ showToast('⚠️ '+e.message); }
@@ -1559,12 +1562,12 @@ function buildCoachContext(){
   const w = todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
   let tCal=0, tP=0, tF=0, tC=0;
-  for(const m of meals){
+  for(const m of todayMeals){
     const r = m.amount/100;
     tCal += m.cal*r; tP += m.p*r; tF += m.f*r; tC += m.c*r;
   }
   const byCat = {};
-  for(const m of meals){
+  for(const m of todayMeals){
     if(!byCat[m.timing]) byCat[m.timing] = [];
     byCat[m.timing].push(m);
   }
@@ -1911,7 +1914,8 @@ async function saveRecord(cid){
 
   try {
     const id = await createMealRecord(meal);
-    meals.push({...meal, id});
+    todayMeals.push({...meal, id}); // 今日の集計に必ず反映
+    if(selectedDate === todayStr()) meals = [...todayMeals]; // 今日を表示中なら表示も更新
 
     if(favChecked){
       const favId = await createFavorite({
@@ -1949,7 +1953,9 @@ function sendChip(msg){
 
 // チャット入力欄: Enter送信 / Shift+Enter改行
 function handleChatKeydown(e){
-  if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){
+  // スマホ（タッチ操作が主のデバイス）ではEnterキーは改行。送信はボタンのみ
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  if(e.key === 'Enter' && !e.shiftKey && !e.isComposing && !isTouchDevice){
     e.preventDefault();
     sendChat();
   }
