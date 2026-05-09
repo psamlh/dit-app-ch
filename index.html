@@ -190,9 +190,8 @@ button,input,select{font-family:inherit;color:inherit}
 .reward-status.planning{background:#FFE4ED;color:#C03A66}
 .reward-status.done{background:#EAF7EF;color:#2D8A56}
 .reward-status.repeat{background:#EDE8FF;color:#6B5BC9}
-.reward-memo{font-size:11px;color:#9B8FAE;margin-top:3px;line-height:1.5}
-.reward-url{display:inline-block;font-size:11px;color:#A08AFF;margin-top:4px;text-decoration:none}
-.reward-url:hover{text-decoration:underline}
+.reward-link-icon{font-size:13px;text-decoration:none;flex-shrink:0;line-height:1}
+.reward-memo-inline{font-size:11px;color:#9B8FAE;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#4A3F5C;color:#fff;padding:8px 16px;border-radius:20px;font-size:12px;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 .thinking{padding:6px 12px;color:#9B8FAE;font-size:12px;font-style:italic}
@@ -988,9 +987,12 @@ function refreshHome(){
       else if(r.status === '達成') statusBadge = '<span class="reward-status done">達成</span>';
       else if(r.status === 'また行きたい') statusBadge = '<span class="reward-status repeat">また行きたい</span>';
       item.innerHTML = `
-        <div class="reward-name">${escapeHtml(r.name)} ${statusBadge}</div>
-        ${r.memo ? `<div class="reward-memo">${escapeHtml(r.memo)}</div>` : ''}
-        ${r.url ? `<a class="reward-url" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">🔗 リンク</a>` : ''}
+        <div class="reward-name">
+          ${escapeHtml(r.name)}
+          ${statusBadge}
+          ${r.url ? `<a class="reward-link-icon" href="${escapeHtml(r.url)}" target="_blank" rel="noopener">🔗</a>` : ''}
+          ${r.memo ? `<span class="reward-memo-inline">${escapeHtml(r.memo)}</span>` : ''}
+        </div>
       `;
       list.appendChild(item);
     }
