@@ -68,6 +68,10 @@ button,input,select{font-family:inherit;color:inherit}
 .steps-num{font-size:28px;font-weight:700;line-height:1}
 .steps-sub{font-size:12px;color:#9B8FAE;margin-top:2px}
 .meal-section-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f5edff}
+.meal-day-summary{background:#fff;border-radius:14px;border:1px solid #f0e8f5;padding:10px 14px;margin-bottom:10px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.meal-day-total{font-size:22px;font-weight:700;color:#FF8FAD;line-height:1}
+.meal-day-unit{font-size:11px;color:#9B8FAE}
+.meal-day-pfc{font-size:12px;color:#9B8FAE;margin-left:auto}
 .meal-section-title{font-size:13px;font-weight:700;color:#FF8FAD}
 .meal-section-sum{font-size:10px;color:#9B8FAE}
 .meal-timing-tag{display:inline-block;font-size:9px;color:#A08AFF;background:#EDE8FF;padding:1px 6px;border-radius:8px;margin-top:3px;font-weight:500}
@@ -253,7 +257,7 @@ button,input,select{font-family:inherit;color:inherit}
       <div class="week-cal" id="weekCal"></div>
       <button class="week-nav-btn" onclick="changeWeekOffset(1)" id="nextWeekBtn">›</button>
     </div>
-    <button class="coach-link" onclick="switchTab('coach',null);highlightCoach()">💬 コーチで食事を記録 →</button>
+    <div id="mealDaySummary"></div>
     <div id="mealAllSections"></div>
     <button class="add-btn" onclick="openFavPick()">⭐ お気に入りからクイック記録</button>
   </div>
@@ -1005,6 +1009,23 @@ function refreshMeals(){
   const cats = ['朝昼','おやつ','夜','深夜'];
   const container = document.getElementById('mealAllSections');
   if(!container) return;
+
+  // 1日合計サマリー
+  const summaryEl = document.getElementById('mealDaySummary');
+  if(summaryEl){
+    if(meals.length){
+      let dCal=0, dP=0, dF=0, dC=0;
+      for(const m of meals){ const r=m.amount/100; dCal+=m.cal*r; dP+=m.p*r; dF+=m.f*r; dC+=m.c*r; }
+      summaryEl.innerHTML = `<div class="meal-day-summary">
+        <span style="font-size:10px;color:#9B8FAE;font-weight:700;letter-spacing:.5px;flex-shrink:0">1日合計</span>
+        <span class="meal-day-total">${dCal.toFixed(1)}</span><span class="meal-day-unit">kcal</span>
+        <span class="meal-day-pfc">P&thinsp;${dP.toFixed(1)}g&emsp;F&thinsp;${dF.toFixed(1)}g&emsp;C&thinsp;${dC.toFixed(1)}g</span>
+      </div>`;
+    } else {
+      summaryEl.innerHTML = '';
+    }
+  }
+
   if(!meals.length){
     container.innerHTML = '<div class="card"><div class="empty-text">まだ記録がありません</div></div>';
     return;
