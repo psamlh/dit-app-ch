@@ -2136,9 +2136,17 @@ function renderGraphs(){
     }
     document.getElementById('weightAvg').textContent = avgLabel;
 
-    // 体重スケール
-    const wMin = Math.min(...ws.map(d=>d.weight))-0.3;
-    const wMax = Math.max(...ws.map(d=>d.weight))+0.3;
+    // 体重スケール（XX.0kg単位の切りのいい目盛り）
+    const actualWMin = Math.min(...ws.map(d=>d.weight));
+    const actualWMax = Math.max(...ws.map(d=>d.weight));
+    let wFloor = Math.floor(actualWMin);
+    let wCeil = Math.ceil(actualWMax);
+    if(wCeil === wFloor){ wFloor -= 1; wCeil += 1; }
+    const rawWRange = wCeil - wFloor;
+    const wStep = rawWRange > 6 ? 2 : 1;
+    wFloor = Math.floor(wFloor / wStep) * wStep;
+    wCeil = Math.ceil(wCeil / wStep) * wStep;
+    const wMin = wFloor, wMax = wCeil;
     const wRange = wMax - wMin || 1;
     // 体脂肪率スケール（独立軸）
     let fMin = 0, fRange = 1;
@@ -2157,11 +2165,9 @@ function renderGraphs(){
 
     let html = '';
     // === 縦軸グリッド & ラベル（左:体重 / 右:体脂肪率）===
-    // 体重メモリ（4段階）
+    // 体重メモリ（XX.0kg刻み）
     const wTicks = [];
-    for(let i = 0; i <= 3; i++){
-      wTicks.push(wMin + (wRange * i / 3));
-    }
+    for(let v = wFloor; v <= wCeil; v += wStep) wTicks.push(v);
     wTicks.forEach((val, idx)=>{
       const y = 80 - (val - wMin)/wRange*70;
       html += `<line x1="${xStart}" y1="${y}" x2="${xEnd}" y2="${y}" stroke="#f5edff" stroke-width="0.5"/>`;
