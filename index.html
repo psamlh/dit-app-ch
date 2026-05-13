@@ -37,8 +37,8 @@ button,input,select{font-family:inherit;color:inherit}
 .page.active{display:block}
 .coach-wrap{display:none;height:100%;flex-direction:column}
 .coach-wrap.active{display:flex}
-.coach-history{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch}
-.coach-footer{flex-shrink:0;padding:8px 10px 62px;background:#fff;border-top:1px solid #f0e8f5}
+.coach-history{flex:1;min-height:0;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch}
+.coach-footer{flex-shrink:0;padding:8px 10px calc(62px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #f0e8f5}
 .card{background:#fff;border-radius:16px;padding:14px;border:1px solid #f0e8f5;margin-bottom:10px}
 .sec-title{font-size:10px;color:#9B8FAE;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px}
 .weight-row{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;flex-wrap:wrap}
