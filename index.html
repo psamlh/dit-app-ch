@@ -619,7 +619,8 @@ async function fetchTodayWeight(){
     const tdy = d.results.find(r=> r.properties['日付']?.date?.start === today);
     if(tdy){
       const p = tdy.properties;
-      todayData.weight = p['体重']?.number;
+      const wVal = p['体重']?.number;
+      todayData.weight = (wVal && wVal > 0) ? wVal : null;
       const fatVal = p['体脂肪率']?.number;
       todayData.fat = (fatVal && fatVal > 0) ? fatVal : null;
       todayData.bmi = p['BMI']?.formula?.number;
@@ -653,7 +654,7 @@ async function fetchWeekData(){
     const fatVal = r.properties['体脂肪率']?.number;
     return {
       date:r.properties['日付']?.date?.start,
-      weight:r.properties['体重']?.number,
+      weight:(()=>{ const w=r.properties['体重']?.number; return (w && w>0)?w:null; })(),
       fat:(fatVal && fatVal > 0) ? fatVal : null,
       steps:r.properties['歩数']?.number
     };
@@ -2091,7 +2092,7 @@ async function loadGraphData(days){
         const fatVal = r.properties['体脂肪率']?.number;
         return {
           date: r.properties['日付']?.date?.start,
-          weight: r.properties['体重']?.number,
+          weight: (()=>{ const w=r.properties['体重']?.number; return (w && w>0)?w:null; })(),
           fat: (fatVal && fatVal > 0) ? fatVal : null,
           steps: r.properties['歩数']?.number
         };
