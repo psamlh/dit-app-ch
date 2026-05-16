@@ -1509,9 +1509,17 @@ async function saveMemoToNotion(text){
     })
   });
 }
-function appendToLifelog(text){
+async function appendToLifelog(text){
   if(!text) return;
-  const current = localStorage.getItem('coachMemo') || '';
+  // Notionから最新メモを取得してから追記（デバイス間で上書き競合しないように）
+  let current = localStorage.getItem('coachMemo') || '';
+  if(S.notionKey && todayData.pageId){
+    try {
+      const page = await notionFetch(`https://api.notion.com/v1/pages/${todayData.pageId}`);
+      const notionMemo = page.properties['メモ']?.rich_text?.[0]?.plain_text;
+      if(notionMemo != null) current = notionMemo;
+    } catch(e){ console.warn('lifelog fetch error:', e); }
+  }
   const newMemo = current ? current + '\n' + text : text;
   localStorage.setItem('coachMemo', newMemo);
   const ta = document.getElementById('memoText');
