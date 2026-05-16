@@ -865,7 +865,7 @@ async function fullSync(){
       fetchRewards().catch(e=>console.warn(e)),
       fetchWeeklyCalories().catch(e=>console.warn(e))
     ]);
-    refreshGoals(); refreshHome(); refreshMeals();
+    refreshGoals(); refreshHome(); refreshMeals(); loadMemo();
     setSync('ok');
     // 0時前後なら前日レポートを自動表示
     checkDailyReport();
@@ -1509,6 +1509,17 @@ async function saveMemoToNotion(text){
     })
   });
 }
+function appendToLifelog(text){
+  if(!text) return;
+  const current = localStorage.getItem('coachMemo') || '';
+  const newMemo = current ? current + '\n' + text : text;
+  localStorage.setItem('coachMemo', newMemo);
+  const ta = document.getElementById('memoText');
+  if(ta) ta.value = newMemo;
+  updateMemoPreview();
+  showToast('📋 ライフログに追記しました');
+  saveMemoToNotion(newMemo).catch(e => console.warn('lifelog append error:', e));
+}
 function updateMemoPreview(){
   const text = (document.getElementById('memoText')?.value || localStorage.getItem('coachMemo') || '').trim();
   const el = document.getElementById('memoBarPreview');
@@ -1790,7 +1801,13 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 - 具体的な食材・量で提案
 - すでに目標達成しているならそれも伝える
 
-ただし、相談・質問・アドバイス依頼の場合（「今日の分析」「夜何食べる？」など）は<meal_data>を出さず普通に答えるだけにしてください。`;
+ただし、相談・質問・アドバイス依頼の場合（「今日の分析」「夜何食べる？」など）は<meal_data>を出さず普通に答えるだけにしてください。
+
+【ライフログへの自動追記】
+会話中にユーザーが体調・予定・生活習慣に関する重要情報を教えてくれた場合（会食・飲み会の予定、生理・体調不良、筋トレ・運動、旅行・出張、睡眠不足など）は、その内容をコンパクトに整理してライフログに追記してください。
+形式：返答の末尾に [[LIFELOG: 追記テキスト]] を置いてください（このタグは画面から自動的に除去され、ライフログ欄に保存されます）。
+例：ユーザー「明日取引先との会食があります」→ 末尾に [[LIFELOG: 明日会食（外食）]] を追加。
+複数の情報は1つのタグにまとめる。既にライフログに書かれている情報は追記不要。食事記録の提案（<meal_data>）とは独立して使えます。`;
 
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages',{
@@ -1824,8 +1841,13 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
     document.getElementById('thinking-msg')?.remove();
 
     const mealMatch = replyText.match(/<meal_data>([\s\S]*?)<\/meal_data>/);
-    const cleanText = replyText.replace(/<meal_data>[\s\S]*?<\/meal_data>/g, '').trim();
+    const lifelogMatch = replyText.match(/\[\[LIFELOG:([\s\S]*?)\]\]/);
+    const cleanText = replyText
+      .replace(/<meal_data>[\s\S]*?<\/meal_data>/g, '')
+      .replace(/\[\[LIFELOG:[\s\S]*?\]\]/g, '')
+      .trim();
 
+    if(lifelogMatch) appendToLifelog(lifelogMatch[1].trim());
     if(cleanText) addBubble('bot', cleanText);
 
     if(mealMatch){
