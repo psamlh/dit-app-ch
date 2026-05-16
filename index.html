@@ -140,13 +140,15 @@ button,input,select{font-family:inherit;color:inherit}
 .attached-preview{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#FFE4ED;border-radius:10px;margin-bottom:8px;font-size:11px;color:#FF8FAD}
 .attached-preview img{width:30px;height:30px;border-radius:6px;object-fit:cover}
 .attached-preview .clear-btn{margin-left:auto;background:none;border:none;color:#FF8FAD;cursor:pointer;font-size:16px;padding:0}
-.weight-svg{width:100%;max-width:600px;display:block;margin:0 auto;aspect-ratio:340/80}
+.weight-svg{width:100%;max-width:600px;display:block;margin:0 auto;aspect-ratio:340/90}
 .mini-graph{display:flex;height:90px;position:relative;margin-top:4px;padding-bottom:14px;max-width:600px;margin-left:auto;margin-right:auto;gap:4px}
 .bar-yaxis{display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:#9B8FAE;width:30px;flex-shrink:0;text-align:right;padding-right:2px;padding-bottom:14px}
-.bar-area{flex:1;display:flex;align-items:flex-end;gap:3px;border-left:1px solid #f5edff;padding-left:4px}
-.bar-wrap{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end;overflow:hidden}
-.bar{width:100%;border-radius:4px 4px 0 0;min-height:4px}
-.bar-lbl,.bar-val{font-size:8px;color:#9B8FAE;max-width:100%;overflow:hidden;white-space:nowrap}
+.bar-area{flex:1;display:flex;align-items:stretch;gap:3px;border-left:1px solid #f5edff;padding-left:4px}
+.bar-wrap{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;overflow:hidden}
+.bar-col{flex:1;width:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;overflow:hidden;gap:2px}
+.bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;align-self:stretch}
+.bar-lbl{font-size:8px;color:#9B8FAE;max-width:100%;overflow:hidden;white-space:nowrap;height:14px;line-height:14px;flex-shrink:0;text-align:center}
+.bar-val{font-size:8px;color:#9B8FAE;max-width:100%;overflow:hidden;white-space:nowrap}
 .memo-bar{background:#fff;border-bottom:1px solid #f0e8f5;flex-shrink:0}
 .memo-bar-head{display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:pointer;user-select:none}
 .memo-bar-title{font-size:11px;font-weight:700;color:#A08AFF;flex-shrink:0}
@@ -315,7 +317,7 @@ button,input,select{font-family:inherit;color:inherit}
         <span class="graph-avg" id="weightAvg">--</span>
       </div>
       <div style="position:relative">
-        <svg class="weight-svg" id="weightSvg" viewBox="0 0 340 80" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg class="weight-svg" id="weightSvg" viewBox="0 0 340 90" preserveAspectRatio="xMidYMid meet"></svg>
         <div id="graphTooltip" style="display:none;position:absolute;background:#4A3F5C;color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;pointer-events:none;z-index:10;line-height:1.5;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15)"></div>
       </div>
       <div style="display:flex;gap:14px;font-size:10px;margin-top:6px;justify-content:center">
@@ -2221,9 +2223,7 @@ function renderGraphs(){
     wTicks.forEach((val, idx)=>{
       const y = 80 - (val - wMin)/wRange*70;
       html += `<line x1="${xStart}" y1="${y}" x2="${xEnd}" y2="${y}" stroke="#f5edff" stroke-width="0.5"/>`;
-      if(idx > 0){
-        html += `<text x="${xStart-2}" y="${y+3}" text-anchor="end" font-size="7" fill="#FF8FAD">${val.toFixed(1)}</text>`;
-      }
+      html += `<text x="${xStart-2}" y="${y+3}" text-anchor="end" font-size="7" fill="#FF8FAD">${val.toFixed(1)}</text>`;
     });
     // 体脂肪率メモリ（右側、データある時のみ）
     if(fs.length){
@@ -2233,9 +2233,7 @@ function renderGraphs(){
       }
       fTicks.forEach((val, idx)=>{
         const y = 80 - (val - fMin)/fRange*70;
-        if(idx > 0){
-          html += `<text x="${xEnd+2}" y="${y+3}" text-anchor="start" font-size="7" fill="#A08AFF">${val.toFixed(1)}</text>`;
-        }
+        html += `<text x="${xEnd+2}" y="${y+3}" text-anchor="start" font-size="7" fill="#A08AFF">${val.toFixed(1)}</text>`;
       });
     }
 
@@ -2402,8 +2400,10 @@ function renderBarGraph(cid, avgId, vals, labels, goal, unit, col, period){
       }
     }
     return `<div class="bar-wrap">
-      <span class="bar-val">${v > 0 && period === 7 ? Math.round(v).toLocaleString() : ''}</span>
-      <div class="bar" style="height:${h}%;background:${col}"></div>
+      <div class="bar-col">
+        <span class="bar-val">${v > 0 && period === 7 ? Math.round(v).toLocaleString() : ''}</span>
+        <div class="bar" style="height:${h}%;background:${col}"></div>
+      </div>
       <span class="bar-lbl">${lbl}</span>
     </div>`;
   }).join('') + '</div>';
