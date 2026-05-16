@@ -903,14 +903,19 @@ function refreshHome(){
     tCal += m.cal*r; tP += m.p*r; tF += m.f*r; tC += m.c*r;
   }
   document.getElementById('calVal').textContent = tCal.toFixed(1);
-  // 残り = max基準で計算（オーバー判定）
-  const calLeftMax = S.goalCalMax - tCal;
+  // 残り = min基準（min到達までの残量）
   const calLeftEl = document.getElementById('calLeft');
-  if(calLeftMax < 0){
-    calLeftEl.textContent = Math.abs(calLeftMax).toFixed(1) + ' オーバー';
+  if(tCal > S.goalCalMax){
+    // 上限超え：オーバー表示
+    calLeftEl.textContent = (tCal - S.goalCalMax).toFixed(1) + ' オーバー';
     calLeftEl.style.color = '#E24B4A';
+  } else if(tCal >= S.goalCalMin){
+    // 下限以上・上限以内：範囲内達成
+    calLeftEl.textContent = '0';
+    calLeftEl.style.color = '#52C27A';
   } else {
-    calLeftEl.textContent = calLeftMax.toFixed(1);
+    // 下限未達：残りカロリーをmin基準で表示
+    calLeftEl.textContent = (S.goalCalMin - tCal).toFixed(1);
     calLeftEl.style.color = '#FF8FAD';
   }
   // カロリーバー：通常時はMAX=goalCalMax、超過時はtCalがMAX（相対的にマーカーがずれる）
