@@ -699,11 +699,11 @@ async function fetchFavorites(){
     defaultAmount: (r.properties['デフォルト量(%)']?.number || 1.0) * 100
   }));
 }
-async function createMealRecord(meal){
+async function createMealRecord(meal, date){
   const props = {
     '食事名':{title:[{text:{content: meal.name}}]},
     '食事タイミング':{select:{name: meal.timing}},
-    '日付':{date:{start: todayStr()}},
+    '日付':{date:{start: date || todayStr()}},
     'カロリー':{number: meal.cal},
     'P':{number: meal.p},
     'F':{number: meal.f},
@@ -1862,6 +1862,10 @@ function renderRecordCard(proposal, photoDataUrl){
     <div class="rec-name">🍽 ${escapeHtml(proposal.name || '食事')}</div>
     <div class="rec-summary">1人前 ${Math.round(proposal.cal||0)}kcal / P:${Math.round(proposal.p||0)}g F:${Math.round(proposal.f||0)}g C:${Math.round(proposal.c||0)}g</div>
     <div class="rec-row">
+      <label>日付</label>
+      <input type="date" class="rec-input" data-field="recDate" value="${todayStr()}" max="${todayStr()}">
+    </div>
+    <div class="rec-row">
       <label>タイミング</label>
       <select class="rec-input" data-field="timing">
         <option ${timing==='朝昼'?'selected':''}>朝昼</option>
@@ -1919,6 +1923,7 @@ async function saveRecord(cid){
   saveBtn.textContent = '保存中...';
 
   const proposal = card._proposal;
+  const recDate = card.querySelector('[data-field="recDate"]').value || todayStr();
   const timing = card.querySelector('[data-field="timing"]').value;
   const amount = parseInt(card.querySelector('[data-field="amount"]').value) || 100;
   const favChecked = card.querySelector('input[type="checkbox"]').checked;
@@ -1936,9 +1941,11 @@ async function saveRecord(cid){
   };
 
   try {
-    const id = await createMealRecord(meal);
-    todayMeals.push({...meal, id}); // 今日の集計に必ず反映
-    if(selectedDate === todayStr()) meals = [...todayMeals]; // 今日を表示中なら表示も更新
+    const id = await createMealRecord(meal, recDate);
+    // 今日の記録なら todayMeals（ホーム集計）に反映
+    if(recDate === todayStr()) todayMeals.push({...meal, id});
+    // 表示中の日付と一致するなら meals（食事タブ）に反映
+    if(recDate === selectedDate) meals.push({...meal, id});
 
     if(favChecked){
       const favId = await createFavorite({
@@ -1954,12 +1961,14 @@ async function saveRecord(cid){
       });
     }
 
-    refreshHome(); refreshMeals();
+    if(recDate === todayStr()) refreshHome(); // 今日分ならホームのPFC集計を更新
+    refreshMeals();
     card.classList.add('saved');
     card.querySelectorAll('button,input,select').forEach(el => el.disabled = true);
     const msg = document.createElement('div');
     msg.className = 'rec-saved-msg';
-    msg.textContent = '✓ 記録しました' + (favChecked ? '（お気に入り登録済み）' : '');
+    const dateLabel = recDate === todayStr() ? '今日' : recDate;
+    msg.textContent = `✓ ${dateLabel}に記録しました` + (favChecked ? '（お気に入り登録済み）' : '');
     card.appendChild(msg);
   } catch(e){
     saveBtn.disabled = false;
