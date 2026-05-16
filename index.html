@@ -1401,15 +1401,21 @@ async function checkDailyReport(){
 
   const w = yWeight || todayData.weight || 49.5;
   const pGoal = Math.round(w * S.goalPRatio);
-  const reportPrompt = `__DAILY_REPORT__ 昨日(${yStr})の記録:
-体重: ${yWeight || '記録なし'}kg ／ 歩数: ${ySteps?.toLocaleString() || '?'}歩
+  const reportTrend = buildWeeklyTrendText();
+  const reportLifelog = localStorage.getItem('coachMemo') || '(なし)';
+  const reportPrompt = `昨日(${yStr})のデータ:
+体重: ${yWeight || '記録なし'}kg / 体脂肪率: ${yFat ? yFat + '%' : '記録なし'} ／ 歩数: ${ySteps?.toLocaleString() || '?'}歩
 今週平均歩数（月〜日）: ${weekAvg.toLocaleString()}歩 / 目標${S.goalSteps.toLocaleString()}歩
 カロリー: ${totCal.toFixed(1)}/${S.goalCalMin}〜${S.goalCalMax}kcal
-PFC: P${totP.toFixed(1)}/${pGoal}g+ F${totF.toFixed(1)}/${S.goalF}g C${totC.toFixed(1)}g
+PFC: P${totP.toFixed(1)}/${pGoal}g以上 F${totF.toFixed(1)}/${S.goalF}g C${totC.toFixed(1)}g
 食事:
 ${mealsSummary || '(記録なし)'}
 
-昨日の振り返りと今日のアドバイスを短くお願い。`;
+直近の体重・体脂肪率・歩数推移（〜昨日）:
+${reportTrend}
+
+ライフログ・予定メモ:
+${reportLifelog}`;
 
   // 履歴に積まずに直接レポート表示
   if(!coachInited){
@@ -1439,21 +1445,36 @@ ${mealsSummary || '(記録なし)'}
   h.scrollTop = h.scrollHeight;
 
   try {
-    const sys = `あなたはほし(Cherubi)さんのフレンドリーなダイエットコーチです。
+    const sys = `あなたはcherubiさんのフレンドリーなダイエットコーチです。
 プロフィール: 身長${S.height}cm、現在の主目標は体重48kg達成。
 PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 
-【重要】
-- **体脂肪率には触れないでください**（48kg達成までは体重最優先）
-- 歩数は1日単位ではなく**週平均（月〜日）で評価**してください（休日は少なくてOK）
-- マークダウン記法は使わない。プレーンテキストで改行と絵文字で整える
+【ルール】
+- 歩数は1日単位ではなく週平均（月〜日）で評価（休日は少なくてOK）
+- マークダウン記法（## 見出し、**太字**、- 箇条書き）を積極的に使うこと
+- <meal_data>タグは出力しないこと
 
-ユーザーから __DAILY_REPORT__ で始まるメッセージが来た場合、昨日の振り返りと今日のアドバイスを以下の構成で短くまとめてください：
-1. 昨日の良かったこと（褒める）
-2. 改善ポイント（あれば）
-3. 今日の目標・アドバイス
+以下の4トピックを ## 見出しで区切って日次レポートを書いてください。
 
-絵文字を使ってフレンドリーに、4〜6行程度で。<meal_data>は出さないでください。`;
+## 体重・体脂肪率
+直近数日の推移データを踏まえた客観的な評価。
+体重増減の原因（食べすぎ・塩分・水分・生理周期など）を具体的に考察すること。
+例：「〇日の食事が影響している」「✕日からの流れが良い」
+
+## 今日の行動
+昨日の食事・歩数・ライフログから振り返り。
+良かった点を具体的に褒め、改善ポイントがあれば伝える。
+
+## 明日の意識
+明日どう過ごすべきか。
+朝昼・おやつ・夜の具体的な食事提案、水分・塩分・運動など生活面も含めること。
+
+## 明日以降の体重予測
+現在のトレンドと今日の行動をもとに1週間先まで予測する。
+具体的な数値と動きのパターンで記述すること。
+例：「明日〜明後日 X.Xkgにタッチ、3〜7日後 X.Xkg台を行き来」
+
+全体的に絵文字を適度に使い、フレンドリーなトーンで。`;
 
     const r = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1465,7 +1486,7 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
       },
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens: 600,
+        max_tokens: 1500,
         system: sys,
         messages: [{role:'user', content: reportPrompt}]
       })
@@ -1772,7 +1793,10 @@ async function sendChat(){
   const weekTrend = buildWeeklyTrendText();
   const recentMeals = buildRecentMealsText();
   const lifeMemo = localStorage.getItem('coachMemo') || '';
-  const sys = `あなたはほし(Cherubi)さんのフレンドリーなダイエットコーチです。
+  const favText = favorites.length
+    ? favorites.map(f => `- ${f.name}：${f.cal.toFixed(1)}kcal P${f.p.toFixed(1)}g F${f.f.toFixed(1)}g C${f.c.toFixed(1)}g`).join('\n')
+    : '(まだ登録なし)';
+  const sys = `あなたはcherubiさんのフレンドリーなダイエットコーチです。
 ユーザーのプロフィール: 身長${S.height}cm、目標体重48kg
 今日の状況:
 - 体重 ${todayData.weight || '?'}kg、体脂肪率 ${todayData.fat || '?'}%
@@ -1797,7 +1821,13 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 **現在の主目標は48kgの体重達成です。体脂肪率については48kg達成まで言及しないでください**（聞かれた時だけ答える）。
 
 【出力形式】
-プレーンテキストで返答してください。**マークダウン記法（# 見出し、**太字**、- リスト等）は使わない**こと。改行と絵文字で読みやすく整えてください。
+マークダウン記法（## 見出し、**太字**、- 箇条書き）を使って読みやすく整えてください。絵文字も適宜使う。
+
+【お気に入り食事リスト】
+cherubiさんがよく食べる登録済み食事：
+${favText}
+食事を提案・言及する際はこのリストから優先的に選んでください。
+ただしリストのカロリー・PFC数値はデータベース登録値で誤りがある可能性があります。実際の栄養素として正確な値と思われる数値を提案に使い、差異があれば指摘してください。
 
 【重要：食事記録の処理】
 ユーザーが食べた/食べる予定の食事を伝えてきた場合（写真や説明）、料理ごとに以下のJSON形式で食事候補を提案してください。短いコメントとともに、必ず最後に <meal_data>...</meal_data> タグで囲んで出力してください。
