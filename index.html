@@ -1285,10 +1285,10 @@ function renderMarkdown(text){
   );
   // インラインコード `code`
   html = html.replace(/`([^`\n]+)`/g, '<code style="background:#FDF5FF;padding:1px 5px;border-radius:4px;font-size:11px">$1</code>');
-  // 見出し ### H3 / ## H2 / # H1（マージン最小限）
-  html = html.replace(/^### (.+)$/gm, '<span style="font-size:13px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
-  html = html.replace(/^## (.+)$/gm, '<span style="font-size:14px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
-  html = html.replace(/^# (.+)$/gm, '<span style="font-size:15px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
+  // 見出し ### H3 / ## H2 / # H1（直後の\nも消費して下の余白を上と揃える）
+  html = html.replace(/^### (.+)\n?/gm, '<span style="font-size:13px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
+  html = html.replace(/^## (.+)\n?/gm, '<span style="font-size:14px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
+  html = html.replace(/^# (.+)\n?/gm, '<span style="font-size:15px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
   // 太字 **text** または __text__
   html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
