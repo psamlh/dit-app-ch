@@ -1285,19 +1285,19 @@ function renderMarkdown(text){
   );
   // インラインコード `code`
   html = html.replace(/`([^`\n]+)`/g, '<code style="background:#FDF5FF;padding:1px 5px;border-radius:4px;font-size:11px">$1</code>');
-  // 見出し ### H3 / ## H2 / # H1
-  html = html.replace(/^### (.+)$/gm, '<div style="font-size:13px;font-weight:700;margin:8px 0 4px;color:#FF8FAD">$1</div>');
-  html = html.replace(/^## (.+)$/gm, '<div style="font-size:14px;font-weight:700;margin:8px 0 4px;color:#FF8FAD">$1</div>');
-  html = html.replace(/^# (.+)$/gm, '<div style="font-size:15px;font-weight:700;margin:8px 0 4px;color:#FF8FAD">$1</div>');
+  // 見出し ### H3 / ## H2 / # H1（マージン最小限）
+  html = html.replace(/^### (.+)$/gm, '<span style="font-size:13px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
+  html = html.replace(/^## (.+)$/gm, '<span style="font-size:14px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
+  html = html.replace(/^# (.+)$/gm, '<span style="font-size:15px;font-weight:700;color:#FF8FAD;display:block;margin-top:4px">$1</span>');
   // 太字 **text** または __text__
   html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
   // 斜体 *text*
   html = html.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
-  // 番号付きリスト 1. xxx
-  html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="margin-left:14px;text-indent:-14px">$1. $2</div>');
-  // 箇条書き - xxx / * xxx
-  html = html.replace(/^[-*] (.+)$/gm, '<div style="margin-left:14px;text-indent:-14px">・ $1</div>');
+  // 番号付きリスト 1. xxx → そのままプレーンテキスト（改行はあとで<br>変換）
+  html = html.replace(/^(\d+)\. (.+)$/gm, '$1. $2');
+  // 箇条書き - xxx / * xxx → ・に置換（divラップしない・間に空行なし）
+  html = html.replace(/^[-*] (.+)$/gm, '・$1');
   // リンク [text](url)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#A08AFF;text-decoration:underline">$1</a>');
   // 改行
@@ -1899,7 +1899,10 @@ PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
 **現在の主目標は48kgの体重達成です。体脂肪率については48kg達成まで言及しないでください**（聞かれた時だけ答える）。
 
 【出力形式】
-使えるマークダウン：## 見出し、**太字**、- 箇条書きのみ（表・区切り線は使わない）。見出し前後・箇条書き各行間に余分な空行を入れない。絵文字も適宜使う。
+・箇条書きは「・」を使う（マークダウンの「-」は使わない）。各項目の間に空行を入れない。
+・見出し（##）は使ってよいが、前後に空行を入れない。話題が明確に切り替わる時のみ空行を1行入れる。
+・**太字**は使ってよい。表・区切り線（---）は使わない。
+・全体的にコンパクトにまとめ、装飾目的の空行は入れない。絵文字は適宜使う。
 
 【お気に入り食事リスト】
 cherubiさんがよく食べる登録済み食事：
