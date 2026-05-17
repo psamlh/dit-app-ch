@@ -851,6 +851,46 @@ async function fetchGoalsFromProfile(){
   } catch(e){ console.warn('goal fetch:', e); }
 }
 
+// プロフィールのスキップセクションに注釈を追加（初回のみ）
+async function addProfileSectionNotes(){
+  if(localStorage.getItem('profileNoteAdded_v1')) return;
+  const profilePageId = '3553a7d6-c354-810c-86a8-c75db8003b3e';
+  const SKIP_SECTIONS = ['基本情報', '1日の目標', '体型計測', 'アプリ用目標値'];
+  const NOTE_TEXT = '📵 このセクションの内容はAIコーチには送信されません';
+  try {
+    const d = await notionFetch(`https://api.notion.com/v1/blocks/${profilePageId}/children?page_size=100`);
+    for(let i = 0; i < d.results.length; i++){
+      const block = d.results[i];
+      if(block.type !== 'heading_1') continue;
+      const title = block.heading_1?.rich_text?.map(t=>t.plain_text).join('') || '';
+      if(!SKIP_SECTIONS.some(s => title.includes(s))) continue;
+      // 次のブロックが既に同じ注釈なら追加しない
+      const next = d.results[i+1];
+      if(next?.type === 'callout'){
+        const nextText = next.callout?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(nextText.includes('AIコーチには送信されません')) continue;
+      }
+      // heading_1の直後にcalloutを挿入
+      await notionFetch(`https://api.notion.com/v1/blocks/${profilePageId}/children`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          children: [{
+            object: 'block',
+            type: 'callout',
+            callout: {
+              rich_text: [{ type: 'text', text: { content: NOTE_TEXT } }],
+              icon: { type: 'emoji', emoji: '📵' },
+              color: 'gray_background'
+            }
+          }],
+          after: block.id
+        })
+      });
+    }
+    localStorage.setItem('profileNoteAdded_v1', '1');
+  } catch(e){ console.warn('profile note:', e); }
+}
+
 // ごほうびリスト取得
 async function fetchRewards(){
   if(!S.rewardDbId) return;
@@ -907,8 +947,9 @@ async function fullSync(){
   if(!S.notionKey){ setSync('err'); throw new Error('Notion APIキー未設定'); }
   setSync('');
   try {
+    await fetchGoalsFromProfile().catch(e=>console.warn(e));
+    addProfileSectionNotes().catch(e=>console.warn(e)); // 初回のみ注釈追加
     await Promise.all([
-      fetchGoalsFromProfile().catch(e=>console.warn(e)),
       fetchTodayWeight().catch(e=>console.warn(e)),
       fetchWeekData().catch(e=>console.warn(e)),
       fetchTodayMeals().catch(e=>console.warn(e)),
