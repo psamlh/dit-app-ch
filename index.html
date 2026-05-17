@@ -427,7 +427,7 @@ const S = {
   goalPRatio:1.6, goalF:45, goalSteps:7000, height:159
 };
 let meals=[], todayMeals=[], favorites=[], weekData=[], chatHistory=[];
-let rewards=[], dietGoals='';
+let rewards=[], dietGoals='', profileContext='';
 let todayData = {weight:null, fat:null, bmi:null, steps:null};
 let yesterdayWeight = null;
 let coachInited = false;
@@ -749,37 +749,38 @@ async function deleteMealRecord(id){
 async function fetchGoalsFromProfile(){
   const profilePageId = '3553a7d6-c354-810c-86a8-c75db8003b3e';
   let foundMin = false, foundMax = false;
+  // skip these sections (numeric data already covered by S values or not useful for AI)
+  const SKIP_SECTIONS = ['基本情報', '1日の目標', '体型計測', 'アプリ用目標値'];
   try {
     const d = await notionFetch(`https://api.notion.com/v1/blocks/${profilePageId}/children?page_size=100`);
-    let inGoal = false;
-    let inDietGoal = false;
+    // state: 'idle' | 'goals' | 'skip' | 'collect'
+    let state = 'idle';
+    let currentSection = '';
     let goalParas = [];
+    let contextParts = [];
+    let currentPart = [];
+
+    function flushPart(){
+      if(currentSection && currentPart.length){
+        contextParts.push(`【${currentSection}】\n${currentPart.join('\n')}`);
+      }
+      currentPart = [];
+    }
+
     for(const block of d.results){
-      // 目標値テーブル
-      if(block.type === 'heading_1' && block.heading_1?.rich_text?.[0]?.plain_text?.includes('アプリ用目標値')){
-        inGoal = true; inDietGoal = false; continue;
-      }
-      // ダイエット目標セクション
-      if(block.type === 'heading_1' && block.heading_1?.rich_text?.[0]?.plain_text?.includes('ダイエット目標')){
-        inDietGoal = true; inGoal = false; continue;
-      }
-      if((inGoal || inDietGoal) && block.type === 'heading_1'){
-        inGoal = false; inDietGoal = false;
+      // heading_1 → セクション切り替え
+      if(block.type === 'heading_1'){
+        flushPart();
+        const title = block.heading_1?.rich_text?.map(t=>t.plain_text).join('') || '';
+        currentSection = title;
+        if(title.includes('アプリ用目標値')){ state = 'goals'; }
+        else if(SKIP_SECTIONS.some(s => title.includes(s))){ state = 'skip'; }
+        else { state = 'collect'; }
         continue;
       }
-      // ダイエット目標のテキスト集計
-      if(inDietGoal){
-        if(block.type === 'paragraph'){
-          const text = block.paragraph?.rich_text?.map(t=>t.plain_text).join('') || '';
-          if(text.trim()) goalParas.push(text);
-        } else if(block.type === 'quote'){
-          const text = block.quote?.rich_text?.map(t=>t.plain_text).join('') || '';
-          if(text.trim()) goalParas.push('💡 ' + text);
-        }
-        continue;
-      }
-      // 目標値テーブル
-      if(inGoal && block.type === 'table'){
+
+      // アプリ用目標値テーブル → S値更新
+      if(state === 'goals' && block.type === 'table'){
         const rows = await notionFetch(`https://api.notion.com/v1/blocks/${block.id}/children?page_size=100`);
         for(const row of rows.results){
           if(row.type !== 'table_row') continue;
@@ -796,10 +797,54 @@ async function fetchGoalsFromProfile(){
           else if(key === 'target_steps') S.goalSteps = val;
           else if(key === 'height') S.height = val;
         }
-        inGoal = false;
+        state = 'idle';
+        continue;
+      }
+
+      if(state === 'skip' || state === 'idle' || state === 'goals') continue;
+
+      // state === 'collect' → profileContext用にテキスト収集
+      if(block.type === 'paragraph'){
+        const text = block.paragraph?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(text.trim()){
+          currentPart.push(text.trim());
+          if(currentSection.includes('ダイエット目標')) goalParas.push(text.trim());
+        }
+      } else if(block.type === 'bulleted_list_item'){
+        const text = block.bulleted_list_item?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(text.trim()){
+          currentPart.push('・' + text.trim());
+          if(currentSection.includes('ダイエット目標')) goalParas.push(text.trim());
+        }
+      } else if(block.type === 'numbered_list_item'){
+        const text = block.numbered_list_item?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(text.trim()) currentPart.push(text.trim());
+      } else if(block.type === 'quote'){
+        const text = block.quote?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(text.trim()){
+          currentPart.push('💡 ' + text.trim());
+          if(currentSection.includes('ダイエット目標')) goalParas.push('💡 ' + text.trim());
+        }
+      } else if(block.type === 'heading_2'){
+        const text = block.heading_2?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(text.trim()) currentPart.push(`▼${text.trim()}`);
+      } else if(block.type === 'heading_3'){
+        const text = block.heading_3?.rich_text?.map(t=>t.plain_text).join('') || '';
+        if(text.trim()) currentPart.push(`▼${text.trim()}`);
+      } else if(block.type === 'table'){
+        const rows = await notionFetch(`https://api.notion.com/v1/blocks/${block.id}/children?page_size=100`);
+        for(const row of rows.results){
+          if(row.type !== 'table_row') continue;
+          const cells = row.table_row.cells;
+          const parts = cells.map(c => c.map(t=>t.plain_text).join('')).filter(s=>s.trim());
+          if(parts.length) currentPart.push(parts.join('：'));
+        }
       }
     }
+    flushPart();
+
     dietGoals = goalParas.join('\n').trim();
+    profileContext = contextParts.join('\n').trim();
     // Notionにmin/max未定義ならtarget_calorie±50で補完
     if(!foundMin) S.goalCalMin = S.goalCal - 50;
     if(!foundMax) S.goalCalMax = S.goalCal + 50;
@@ -1534,7 +1579,7 @@ ${reportLifelog}`;
   try {
     const sys = `あなたはcherubiさんのフレンドリーなダイエットコーチです。
 プロフィール: 身長${S.height}cm、主目標は体重48kg達成。PFC優先度: P最優先 > F制限 > C残り。語尾は柔らかめ。
-【ルール】
+${profileContext ? '【プロフィール詳細】\n' + profileContext + '\n' : ''}【ルール】
 - 歩数は週平均（月〜日）で評価（休日は少なくてOK）
 - 使えるマークダウン：## 見出し、**太字**、- 箇条書きのみ。表・区切り線（---）は使わない
 - 見出しの直前・直後に空行を入れない。箇条書きの各項目間も空行を入れない
@@ -1876,7 +1921,7 @@ async function sendChat(){
     : '(まだ登録なし)';
   const sys = `あなたはcherubiさんのフレンドリーなダイエットコーチです。
 ユーザーのプロフィール: 身長${S.height}cm、目標体重48kg
-今日の状況:
+${profileContext ? '【プロフィール詳細】\n' + profileContext + '\n' : ''}今日の状況:
 - 体重 ${todayData.weight || '?'}kg、体脂肪率 ${todayData.fat || '?'}%
 - カロリー ${ctx.tCal.toFixed(1)}/${S.goalCalMin}〜${S.goalCalMax}kcal（範囲内が理想）
 - タンパク質 ${ctx.tP.toFixed(1)}/${ctx.pGoal}g以上（最優先）
