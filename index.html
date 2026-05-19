@@ -428,6 +428,7 @@ const S = {
 };
 let meals=[], todayMeals=[], favorites=[], weekData=[], chatHistory=[];
 let rewards=[], dietGoals='', profileContext='';
+let todayDataFetchedAt = 0;
 let todayData = {weight:null, fat:null, bmi:null, steps:null};
 let yesterdayWeight = null;
 let coachInited = false;
@@ -957,6 +958,7 @@ async function fullSync(){
       fetchRewards().catch(e=>console.warn(e)),
       fetchWeeklyCalories().catch(e=>console.warn(e))
     ]);
+    todayDataFetchedAt = Date.now();
     refreshGoals(); refreshHome(); refreshMeals(); loadMemo();
     setSync('ok');
     // 0時前後なら前日レポートを自動表示
@@ -1952,6 +1954,15 @@ async function sendChat(){
   h.appendChild(thinking);
   h.scrollTop = h.scrollHeight;
 
+  // 今日のデータが5分以上古ければNotionから再取得してプロンプトに最新を反映
+  const _now = Date.now();
+  if(_now - todayDataFetchedAt > 5 * 60 * 1000){
+    await Promise.all([
+      fetchTodayMeals().catch(e=>console.warn(e)),
+      fetchTodayWeight().catch(e=>console.warn(e))
+    ]);
+    todayDataFetchedAt = _now;
+  }
   await fetchRecentMeals();
   const ctx = buildCoachContext();
   const weekTrend = buildWeeklyTrendText();
